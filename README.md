@@ -17,7 +17,9 @@
 
 `list_vaults` で得た `share_id` ごとに検索します。`complete: false` の場合は、同じ条件に `next_cursor` を `cursor` として渡して続行し、各ページの `matches` を集めてください。対象一覧が途中で変わった場合は最初から検索します。本文は照合時点の値を使います。
 
-`read_field` は要求した値をツール結果へ返します。利用者が必要とするフィールドを指定してください。検索のみなら `search_notes` を使います。
+`list_items` のタイトル検索は大文字小文字を区別しません。`next_offset` がある場合は、その値を `offset` に指定して続行します。
+
+`search_notes` と `read_field` は、具体的な依頼・目的を示す `reason`（前後の空白を除いて5〜1000文字）が必要です。`read_field` は要求した値をツール結果へ返します。利用者が必要とするフィールドを指定してください。検索のみなら `search_notes` を使います。
 
 ## 起動
 
@@ -54,3 +56,5 @@ PATは設定ファイルに保存せず、既存セッションを参照しま�
 ## ライセンス
 
 [MIT License](LICENSE)
+
+開発・検証については [CONTRIBUTING.md](CONTRIBUTING.md)、システムの構造については [DESIGN.md](DESIGN.md) を参照してください。
