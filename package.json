@@ -1,6 +1,6 @@
 {
   "name": "@kagayoi/proton-pass-mcp",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Read-only MCP server for an existing Proton Pass CLI session",
   "license": "MIT",
   "bin": {

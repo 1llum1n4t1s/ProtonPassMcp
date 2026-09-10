@@ -41,7 +41,7 @@ MCPクライアントには次のstdio設定を登録します。Windowsでク�
   "mcpServers": {
     "proton-pass": {
       "command": "npx",
-      "args": ["--yes", "@kagayoi/proton-pass-mcp@1.0.3"],
+      "args": ["--yes", "@kagayoi/proton-pass-mcp@1.0.4"],
       "env": {
         "PASS_CLI_PATH": "C:/path/to/pass-cli.exe",
         "PROTON_PASS_SESSION_DIR": "C:/path/to/authenticated-session"
