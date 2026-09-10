@@ -1,0 +1,32 @@
+{
+  "name": "proton-pass-mcp-local",
+  "version": "1.0.0",
+  "description": "Read-only MCP server for an existing Proton Pass CLI session",
+  "license": "UNLICENSED",
+  "bin": {
+    "proton-pass-mcp": "src/server.mjs"
+  },
+  "files": ["src/", "CHANGELOG.md"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/1llum1n4t1s/ProtonPassMcp.git"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.mjs",
+    "test": "node --test test/*.test.mjs",
+    "verify": "node scripts/verify.mjs",
+    "prepublishOnly": "pnpm test"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^4.5.4"
+  }
+}
