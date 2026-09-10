@@ -3,14 +3,14 @@ import { readFileSync } from 'node:fs';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { PassClient, PassError } from './pass.mjs';
+import { PassClient, PassError, checkCancellation } from './pass.mjs';
+import { reason, field } from './inputs.mjs';
 
 const client = new PassClient({ executable: process.env.PASS_CLI_PATH,
   sessionDir: process.env.PROTON_PASS_SESSION_DIR });
 const { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 const server = new McpServer({ name: 'proton-pass', version });
 const id = z.string().min(1).max(512).regex(/^[A-Za-z0-9_+=-]+$/);
-const reason = z.string().trim().min(5).max(1000).describe('アクセスが必要な具体的なユーザー依頼・目的');
 const state = z.enum(['active', 'trashed', 'all']).default('active');
 
 function register(name, description, schema, work) {
@@ -18,7 +18,7 @@ function register(name, description, schema, work) {
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true } },
   async (input, extra) => client.exclusive(async () => {
     try {
-      extra.signal.throwIfAborted();
+      checkCancellation(extra.signal);
       const result = await work(input, extra.signal);
       return { content: [{ type: 'text', text: JSON.stringify(result) }], structuredContent: result };
     } catch (error) {
@@ -42,7 +42,7 @@ register('search_notes', 'Proton Passのテキストノートをタイトル・�
 }, (input, signal) => client.searchNotes(input, signal));
 register('read_field', 'ユーザーが取得を求めたProton Passの指定フィールド1つを取得する。値がツール結果に含まれるため、秘密値を必要とする明示依頼で使用する。検索はsearch_notesを使う。', {
   share_id: id, item_id: id, reason,
-  field: z.string().min(1).max(100).regex(/^[A-Za-z][A-Za-z0-9_-]*$/).describe('pass-cliが対応するフィールド名（例 password）。'),
+  field,
 }, (input, signal) => client.field(input, signal));
 
 await server.connect(new StdioServerTransport());

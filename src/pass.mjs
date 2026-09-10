@@ -5,6 +5,10 @@ import { createHash } from 'node:crypto';
 const execute = promisify(execFile);
 export class PassError extends Error {}
 
+export function checkCancellation(signal) {
+  if (signal?.aborted) throw new PassError('呼び出しをキャンセルしました。');
+}
+
 // 生のCLIエラーには秘密が含まれ得るため、分類したメッセージだけ返す。
 export async function runCli(executable, args, env, signal) {
   try {
@@ -17,6 +21,7 @@ export async function runCli(executable, args, env, signal) {
   } catch (error) {
     if (error.name === 'AbortError') throw new PassError('呼び出しをキャンセルしました。');
     if (error.code === 'ENOENT') throw new PassError('PASS_CLI_PATH の実行ファイルが見つかりません。');
+    if (error.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') throw new PassError('pass-cli の出力が上限（8 MiB）を超えました。');
     if (error.killed) throw new PassError('pass-cli がタイムアウトしました。再試行してください。');
     if (/session|authenticat|log.?in|token.*expir/i.test(error.stderr ?? '')) {
       throw new PassError('Proton Passの認証が必要です。設定済みセッションでpass-cli loginを実行してください。');
@@ -36,18 +41,43 @@ function array(value) {
 }
 
 function metadata(item) {
+  if (!item || !['id', 'share_id', 'title', 'state', 'item_type'].every(key => typeof item[key] === 'string')) {
+    throw new PassError('pass-cliのJSON構造が想定と異なります。');
+  }
   return { id: item.id, share_id: item.share_id, title: item.title,
     state: item.state, item_type: item.item_type };
+}
+
+function strings(value, keys) {
+  if (!value || !keys.every(key => typeof value[key] === 'string')) {
+    throw new PassError('pass-cliのJSON構造が想定と異なります。');
+  }
+  return Object.fromEntries(keys.map(key => [key, value[key]]));
+}
+
+function shareRole(value) {
+  if (['Owner', 'Manager', 'Editor', 'Viewer'].includes(value)) return value;
+  // CLIのCustom権限はオブジェクト。許可した2項目だけ再構築する。
+  const custom = value?.Custom;
+  if (custom && typeof custom.name === 'string' && Number.isInteger(custom.permission)
+    && custom.permission >= 0 && custom.permission <= 65535) {
+    return { Custom: { name: custom.name, permission: custom.permission } };
+  }
+  throw new PassError('pass-cliのJSON構造が想定と異なります。');
 }
 
 export class PassClient {
   constructor({ executable, sessionDir, runner = runCli, env = process.env }) {
     if (!executable || !sessionDir) throw new PassError('PASS_CLI_PATH と PROTON_PASS_SESSION_DIR を設定してください。');
     this.executable = executable;
-    this.env = { ...env, PROTON_PASS_SESSION_DIR: sessionDir };
-    // 接続済みセッションを利用し、認証トークンを子プロセスへ引き継がない。
-    delete this.env.PROTON_PASS_PERSONAL_ACCESS_TOKEN;
-    delete this.env.PROTON_PASS_AGENT_REASON;
+    this.env = { ...env };
+    // Windowsの環境変数名は大小文字を区別しない。指定セッションも一意にする。
+    for (const key of Object.keys(this.env)) {
+      if (['PROTON_PASS_PERSONAL_ACCESS_TOKEN', 'PROTON_PASS_AGENT_REASON', 'PROTON_PASS_SESSION_DIR'].includes(key.toUpperCase())) {
+        delete this.env[key];
+      }
+    }
+    this.env.PROTON_PASS_SESSION_DIR = sessionDir;
     this.runner = runner;
     this.queue = Promise.resolve();
   }
@@ -73,15 +103,17 @@ export class PassClient {
 
   async vaults(signal) {
     const data = await this.command(['vault', 'list', '--output', 'json'], { signal });
-    return { vaults: array(data.vaults).map(v => ({ name: v.name, share_id: v.share_id })) };
+    return { vaults: array(data?.vaults).map(v => strings(v, ['name', 'share_id'])) };
   }
 
   async shares(signal) {
     // 共有アイテムも列挙するが、未知フィールドや本文は返さない。
     const data = await this.command(['share', 'list', '--output', 'json'], { signal });
-    return { shares: array(data.shares).map(s => ({
-      share_id: s.id, name: s.name, share_type: s.share_type, share_role: s.share_role,
-    })) };
+    return { shares: array(data?.shares).map(s => {
+      const value = strings(s, ['id', 'name', 'share_type']);
+      if (!['Vault', 'Item'].includes(value.share_type)) throw new PassError('pass-cliのJSON構造が想定と異なります。');
+      return { share_id: value.id, name: value.name, share_type: value.share_type, share_role: shareRole(s.share_role) };
+    }) };
   }
 
   async items({ share_id, type, state = 'active' }, signal) {
@@ -89,7 +121,7 @@ export class PassClient {
     if (type) args.push('--filter-type', type);
     if (state !== 'all') args.push('--filter-state', state);
     const data = await this.command(args, { signal });
-    return array(data.items).map(metadata).sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+    return array(data?.items).map(metadata).sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
   }
 
   async listItems(input, signal) {
@@ -139,7 +171,7 @@ export class PassClient {
 
   async field({ share_id, item_id, field, reason }, signal) {
     const value = await this.command(['item', 'view', '--share-id', share_id,
-      '--item-id', item_id, '--field', field], { reason, signal, json: false });
+      '--item-id', item_id, `--field=${field}`], { reason, signal, json: false });
     return { field, value: value.replace(/\r?\n$/, '') };
   }
 }

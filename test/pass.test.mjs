@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { PassClient, PassError, runCli } from '../src/pass.mjs';
+import { PassClient, PassError, runCli, checkCancellation } from '../src/pass.mjs';
 
 function setup(override) {
   const calls = [];
@@ -14,9 +14,9 @@ function setup(override) {
       calls.push({ args, env });
       if (override) return override(args);
       if (args[0] === 'info') return 'authenticated';
-      if (args[0] === 'share') return JSON.stringify({ shares: [{ id: 'vault', name: 'Default' }] });
+      if (args[0] === 'share') return JSON.stringify({ shares: [{ id: 'vault', name: 'Default', share_type: 'Vault', share_role: 'Owner' }] });
       if (args[1] === 'list') return JSON.stringify({ items });
-      if (args.includes('--field')) return 'field-value\n';
+      if (args.some(arg => arg.startsWith('--field='))) return 'field-value\n';
       return JSON.stringify({ item: { content: { title: 'title', note:
         args.includes('a') ? 'SECRET Keeperからインポート PRIVATE' : 'unrelated' } } });
     } });
@@ -58,7 +58,7 @@ test('空一覧は完了、想定外JSON構造はエラーにする', async () =
   items.length = 0;
   assert.equal((await client.searchNotes({ share_id: 'vault', query: 'x', reason: 'reason' })).complete, true);
   const broken = setup(async args => args[0] === 'info' ? '' : args[1] === 'list'
-    ? JSON.stringify({ items: [{ id: 'a', share_id: 'vault' }] }) : '{"item":{}}').client;
+    ? JSON.stringify({ items: [{ id: 'a', share_id: 'vault', title: 'title', state: 'Active', item_type: 'note' }] }) : '{"item":{}}').client;
   await assert.rejects(broken.searchNotes({ share_id: 'vault', query: 'x', reason: 'reason' }), PassError);
 });
 
@@ -82,7 +82,7 @@ test('指定フィールド1つを理由付きで取得し共有IDも正しく�
   const { client, calls } = setup();
   assert.deepEqual(await client.field({ share_id: 'vault', item_id: 'a', field: 'password', reason: 'explicit request' }),
     { field: 'password', value: 'field-value' });
-  assert.deepEqual(calls[1].args.slice(-2), ['--field', 'password']);
+  assert.equal(calls[1].args.at(-1), '--field=password');
   assert.equal(calls[1].env.PROTON_PASS_AGENT_REASON, 'explicit request');
   assert.equal((await client.shares()).shares[0].share_id, 'vault');
   assert.equal(JSON.stringify(await client.listItems({ share_id: 'vault' })).includes('password'), false);
@@ -95,4 +95,91 @@ test('同時アクセスは直列化し失敗後も次を実行する', async ()
   const two = client.exclusive(async () => { order.push(3); });
   await Promise.allSettled([one, two]);
   assert.deepEqual(order, [1, 2, 3]);
+});
+
+test('不正な一覧メタデータは一覧・ノート検索とも安全な構造エラーにする', async () => {
+  const valid = { id: 'a', share_id: 'vault', title: '', state: 'Active', item_type: 'note' };
+  const malformed = [null, ...Object.keys(valid).flatMap(key =>
+    [undefined, null, 42, { secret: 'DO_NOT_RETURN' }].map(value => ({ ...valid, [key]: value })))];
+  for (const item of malformed) {
+    const { client, calls } = setup(async args => args[0] === 'info' ? '' : JSON.stringify({ items: [item] }));
+    for (const work of [() => client.listItems({ share_id: 'vault' }),
+      () => client.searchNotes({ share_id: 'vault', query: 'x', reason: 'test reason' })]) {
+      await assert.rejects(work(), error => {
+        assert.ok(error instanceof PassError);
+        assert.equal(error.message, 'pass-cliのJSON構造が想定と異なります。');
+        return true;
+      });
+    }
+    assert.ok(calls.every(call => !call.args.includes('view')));
+  }
+  const { client } = setup(async args => args[0] === 'info' ? '' : JSON.stringify({ items: [valid] }));
+  assert.equal((await client.listItems({ share_id: 'vault' })).items[0].title, '');
+});
+
+test('キュー待ち中のキャンセルは秘密の理由を出さず後続処理を妨げない', async () => {
+  const { client, calls } = setup();
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  const first = client.exclusive(() => gate);
+  const controller = new AbortController();
+  const cancelled = client.exclusive(async () => {
+    checkCancellation(controller.signal);
+    return client.info(controller.signal);
+  });
+  const rejected = assert.rejects(cancelled, error => {
+    assert.ok(error instanceof PassError);
+    assert.equal(error.message, '呼び出しをキャンセルしました。');
+    return true;
+  });
+  controller.abort(new Error('SECRET_REASON'));
+  const next = client.exclusive(() => client.info());
+  release();
+  await Promise.all([first, rejected, next]);
+  assert.equal(calls.length, 1);
+  assert.doesNotThrow(() => checkCancellation(new AbortController().signal));
+});
+
+test('保管庫・共有はCLIの型に従い許可メタデータだけを返す', async () => {
+  const vault = { name: 'name', share_id: 'v', secret: 'DO_NOT_RETURN' };
+  const share = { id: 's', name: 'name', share_type: 'Item', share_role: 'Viewer', secret: 'DO_NOT_RETURN' };
+  const make = data => setup(async args => args[0] === 'info' ? '' : JSON.stringify(data)).client;
+  assert.deepEqual(await make({ vaults: [vault] }).vaults(), { vaults: [{ name: 'name', share_id: 'v' }] });
+  for (const role of ['Owner', 'Manager', 'Editor', 'Viewer', { Custom: { name: 'custom', permission: 63 } }]) {
+    const value = { ...share, share_role: typeof role === 'object'
+      ? { Custom: { ...role.Custom, secret: 'DO_NOT_RETURN' }, secret: 'DO_NOT_RETURN' } : role };
+    assert.deepEqual((await make({ shares: [value] }).shares()).shares[0],
+      { share_id: 's', name: 'name', share_type: 'Item', share_role: role });
+  }
+  for (const value of [undefined, null, [], { secret: 'DO_NOT_RETURN' }, 1]) {
+    for (const key of ['name', 'share_id']) {
+      await assert.rejects(make({ vaults: [{ ...vault, [key]: value }] }).vaults(), PassError);
+    }
+    for (const key of ['id', 'name', 'share_type', 'share_role']) {
+      await assert.rejects(make({ shares: [{ ...share, [key]: value }] }).shares(), PassError);
+    }
+  }
+  for (const role of ['unknown', { Custom: { name: {}, permission: 1 } },
+    { Custom: { name: 'x', permission: -1 } }, { Custom: { name: 'x', permission: 65536 } },
+    { Custom: { name: 'x', permission: 1.5 } }]) {
+    await assert.rejects(make({ shares: [{ ...share, share_role: role }] }).shares(), PassError);
+  }
+  for (const method of ['vaults', 'shares', 'items']) {
+    await assert.rejects(make(null)[method]({ share_id: 'v' }), PassError);
+    const root = method === 'items' ? 'items' : method;
+    await assert.rejects(make({ [root]: [null] })[method]({ share_id: 'v' }), PassError);
+  }
+});
+
+test('stdoutとstderrの出力上限超過は内容を出さず専用エラーにする', async () => {
+  for (const stream of ['stdout', 'stderr']) {
+    await assert.rejects(runCli(process.execPath,
+      ['-e', `process.${stream}.write('SECRET'.repeat(1500000))`], process.env), error => {
+      assert.ok(error instanceof PassError);
+      assert.equal(error.message, 'pass-cli の出力が上限（8 MiB）を超えました。');
+      assert.equal(error.stdout, undefined);
+      assert.equal(error.stderr, undefined);
+      return true;
+    });
+  }
 });
