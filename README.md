@@ -37,7 +37,7 @@ MCPクライアントには次のstdio設定を登録します。Windowsでク�
   "mcpServers": {
     "proton-pass": {
       "command": "npx",
-      "args": ["--yes", "proton-pass-mcp-local@1.0.0"],
+      "args": ["--yes", "proton-pass-mcp-local@1.0.1"],
       "env": {
         "PASS_CLI_PATH": "C:/path/to/pass-cli.exe",
         "PROTON_PASS_SESSION_DIR": "C:/path/to/authenticated-session"
@@ -50,3 +50,7 @@ MCPクライアントには次のstdio設定を登録します。Windowsでク�
 PATは設定ファイルに保存せず、既存セッションを参照します。秘密の本文やCLIの生エラーをこのサーバーがログへ保存することはありません。フィールド取得の結果は接続先クライアントに渡ります。
 
 認証エラー時は、同じ `PROTON_PASS_SESSION_DIR` を設定して `pass-cli login` で再認証します。既存セッションの自動ログアウトやトークンの保存は行いません。
+
+## ライセンス
+
+[MIT License](LICENSE)

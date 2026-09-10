@@ -1,8 +1,8 @@
 {
   "name": "proton-pass-mcp-local",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Read-only MCP server for an existing Proton Pass CLI session",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "bin": {
     "proton-pass-mcp": "src/server.mjs"
   },
