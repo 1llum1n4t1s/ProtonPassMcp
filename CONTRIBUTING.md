@@ -11,5 +11,8 @@ pnpm test
 `PASS_CLI_PATH` と `PROTON_PASS_SESSION_DIR` を認証済みセッションに設定した `pnpm verify` は、実セッションでMCP接続・一覧・入力検証を確認します。
 ソースからの起動は同じ環境変数を設定して `pnpm start` を使います。
 
-公開前に `npm pack --dry-run` で配布ファイルを確認し、`npm publish` で公開します。公開前にはテストが自動実行されます。
-パッケージのバージョンは `package.json` が正本です。
+公開は `.github/workflows/publish.yml` からnpm Trusted Publishing（OIDC）を使います。`package.json` と一致する `release/<version>` ブランチをpushすると、依存解決・配布確認・公開前テスト・npm公開を実行します。再開時は同じブランチを指定してworkflow_dispatchを実行します。公開済みバージョンは再公開できません。
+
+npm側の初回設定は、パッケージのTrusted PublisherにGitHub Actionsを選び、ユーザー `1llum1n4t1s`、リポジトリ `ProtonPassMcp`、Workflow filename `publish.yml` を登録します。Environmentは空欄にし、Allowed actionsで `npm publish` による直接公開を許可します。この登録時は本人認証が必要ですが、以降のCI公開でnpmトークンや対話認証は不要です。
+
+パッケージのバージョンは `package.json` が正本です。ローカルでは `npm pack --dry-run` で同梱対象を確認できます。
