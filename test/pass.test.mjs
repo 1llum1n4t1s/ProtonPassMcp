@@ -78,6 +78,32 @@ test('CLIの生エラーに含まれる秘密を返さない', async () => {
   });
 });
 
+test('認証エラーを具体的に分類し、sessionを含むだけの障害は未認証扱いしない', async () => {
+  const cases = [
+    ['Command is not logout there is no session\nError: This operation requires an authenticated client',
+      '指定された保存先に有効なProton Passセッションがありません。同じ PROTON_PASS_SESSION_DIR で認証状態を確認してください。失効理由はCLIから取得できません。'],
+    ['Your session has been invalidated and you have been logged out automatically.\nPlease log in again with: pass login',
+      'Proton Passセッションが無効化され、CLIにより自動ログアウトされました。同じ PROTON_PASS_SESSION_DIR で再認証してください。'],
+    ['Error: This operation requires an authenticated client',
+      'Proton Passの認証が必要です。同じ PROTON_PASS_SESSION_DIR で再認証してください。'],
+    ['Error: Permission denied reading session.json',
+      'pass-cli が失敗しました。対象ID・フィールド名・接続とアクセス権を確認してください。'],
+    ['Error: connection failed at https://example.invalid/session',
+      'pass-cli が失敗しました。対象ID・フィールド名・接続とアクセス権を確認してください。'],
+  ];
+  for (const [stderr, expected] of cases) {
+    await assert.rejects(runCli(process.execPath,
+      ['-e', `process.stderr.write(${JSON.stringify(stderr + '\nSECRET_PASSWORD')}); process.exit(1)`], process.env), error => {
+      assert.ok(error instanceof PassError);
+      assert.equal(error.message, expected);
+      assert.equal(error.stderr, undefined);
+      assert.equal(error.stdout, undefined);
+      assert.equal(error.cause, undefined);
+      return true;
+    });
+  }
+});
+
 test('指定フィールド1つを理由付きで取得し共有IDも正しく返す', async () => {
   const { client, calls } = setup();
   assert.deepEqual(await client.field({ share_id: 'vault', item_id: 'a', field: 'password', reason: 'explicit request' }),

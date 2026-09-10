@@ -23,8 +23,16 @@ export async function runCli(executable, args, env, signal) {
     if (error.code === 'ENOENT') throw new PassError('PASS_CLI_PATH の実行ファイルが見つかりません。');
     if (error.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') throw new PassError('pass-cli の出力が上限（8 MiB）を超えました。');
     if (error.killed) throw new PassError('pass-cli がタイムアウトしました。再試行してください。');
-    if (/session|authenticat|log.?in|token.*expir/i.test(error.stderr ?? '')) {
-      throw new PassError('Proton Passの認証が必要です。設定済みセッションでpass-cli loginを実行してください。');
+    const stderr = error.stderr ?? '';
+    // CLIの具体的な診断だけを分類する。パスやURL中のsession等では判定しない。
+    if (/Your session has been invalidated and you have been logged out automatically\./i.test(stderr)) {
+      throw new PassError('Proton Passセッションが無効化され、CLIにより自動ログアウトされました。同じ PROTON_PASS_SESSION_DIR で再認証してください。');
+    }
+    if (/Command is not logout there is no session/i.test(stderr)) {
+      throw new PassError('指定された保存先に有効なProton Passセッションがありません。同じ PROTON_PASS_SESSION_DIR で認証状態を確認してください。失効理由はCLIから取得できません。');
+    }
+    if (/This operation requires an authenticated client/i.test(stderr)) {
+      throw new PassError('Proton Passの認証が必要です。同じ PROTON_PASS_SESSION_DIR で再認証してください。');
     }
     throw new PassError('pass-cli が失敗しました。対象ID・フィールド名・接続とアクセス権を確認してください。');
   }
