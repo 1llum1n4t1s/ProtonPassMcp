@@ -19,9 +19,11 @@
 
 `list_items` のタイトル検索は大文字小文字を区別しません。`next_offset` がある場合は、その値を `offset` に指定して続行します。
 
-`search_notes` と `read_field` は、具体的な依頼・目的を示す `reason`（前後の空白を除いて5〜1000文字）が必要です。`read_field` は要求した値をツール結果へ返します。利用者が必要とするフィールドを指定してください。検索のみなら `search_notes` を使います。
+`search_notes` と `read_field` は、具体的な依頼・目的を示す `reason`（前後の空白を除いて5〜300文字（上限はUnicodeコードポイント数））が必要です。`read_field` は要求した値をツール結果へ返します。利用者が必要とするフィールドを指定してください。検索のみなら `search_notes` を使います。
 
 ## 起動
+
+`read_field` の `field` は空白・日本語・セクション名（例 `本番.パスワード`）を含む名前を指定できます。1〜100文字で、制御文字は使用できません。
 
 Node.js 22以降と、インストール・認証済みの `pass-cli` が必要です。環境変数には自分のCLI実行ファイルと認証済みセッションのディレクトリを指定してください。
 
@@ -39,7 +41,7 @@ MCPクライアントには次のstdio設定を登録します。Windowsでク�
   "mcpServers": {
     "proton-pass": {
       "command": "npx",
-      "args": ["--yes", "proton-pass-mcp-local@1.0.1"],
+      "args": ["--yes", "proton-pass-mcp-local@1.0.2"],
       "env": {
         "PASS_CLI_PATH": "C:/path/to/pass-cli.exe",
         "PROTON_PASS_SESSION_DIR": "C:/path/to/authenticated-session"
