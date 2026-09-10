@@ -3,7 +3,7 @@
 ## 参照と構造
 
 - 利用者向け手順は [README.md](README.md)、開発手順は [CONTRIBUTING.md](CONTRIBUTING.md)、実装の構造と判断は [DESIGN.md](DESIGN.md) を参照する。
-- `src/server.mjs` は MCP 入力・応答、`src/pass.mjs` は CLI 呼び出しと検索を担当する。変更時は両者の契約と `test/pass.test.mjs` の対応を確認する。
+- MCP 入力・応答は `src/server.mjs`、理由とフィールド名のスキーマは `src/inputs.mjs`、CLI 呼び出しと検索は `src/pass.mjs` を変更する。変更時は各境界の契約と `test/pass.test.mjs`・`test/inputs.test.mjs` の対応を確認する。
 - Node.js 22 以降の JavaScript ESM と pnpm を使う。バージョンと配布設定の正本は `package.json`、依存解決の正本は `pnpm-lock.yaml` とする。
 
 ## 必須検証
