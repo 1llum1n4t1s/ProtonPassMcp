@@ -36,3 +36,9 @@ MCP 入力 → スキーマ検証 → `exclusive` キュー → `PassClient` →
 - フィールド名は1〜100 UTF-16コード単位で、C0・C1制御文字とDELを除く。空白・Unicode・セクション名を保持し、`--field=値` の単一引数として渡してオプションとの混同を避ける。
 - 一覧・検索は許可したフィールドだけを返す。`read_field` は `item view --field` の標準出力末尾の改行を1つ除き、文字列の `value` として返す。この経路は `--output` を指定せず、JSON 解釈や値の形式変換も行わないため、返却文字列の形式は CLI の出力に依存する。秘密を結果へ出す境界はこのツールにある。
 - CLI の生 stderr と未知の内部エラーを MCP 応答へ露出させない。サーバー独自の本文・生エラーログ保存は実装していないが、受信した値の扱いは接続先クライアントに委ねられる。
+
+## 配布と公開の境界
+
+`.github/workflows/publish.yml` が npm 公開を担う。`release/**` への push または手動実行を入口とし、公開ジョブは `release/` ブランチだけで動く。ブランチ名が `package.json` の `release/<version>` と一致することを検証してから、固定 lockfile による依存解決、配布内容の確認、公開へ進む。公開前テストは `package.json` の `prepublishOnly` に集約する。
+
+公開ジョブは npm Trusted Publishing の OIDC 認証を使い、`id-token: write` 権限で provenance 付きのパッケージを公開する。長期保存する npm トークンを CI に持たせず、npm 側に登録したリポジトリ・workflow との信頼関係に依存する。公開処理は共通の concurrency グループで同時実行を抑え、進行中の公開を後続実行でキャンセルしない。この認証経路は MCP 実行時の Proton Pass セッションとは独立している。初回登録と実行手順は [CONTRIBUTING.md](CONTRIBUTING.md) を参照する。

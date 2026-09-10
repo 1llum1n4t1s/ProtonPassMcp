@@ -12,6 +12,7 @@
 - 実装を変更したときは `pnpm test` を実行し、認証失敗、秘密の出力抑制、検索カーソル、直列実行の契約を維持する。テストデータと CLI runner の差し替えを使って確認する。
 - MCP 接続を実セッションで検証するときは、利用可能な `PASS_CLI_PATH` と `PROTON_PASS_SESSION_DIR` を設定して `pnpm verify` を実行する。この検証はアクセス可能な保管庫が1件以上あることを前提とする。
 - 配布内容を変更したときは `npm pack --dry-run` で同梱対象を確認する。公開時の `prepublishOnly` は `pnpm test` を実行する。開発コマンドの詳細は CONTRIBUTING を参照する。
+- リリース作業では [CONTRIBUTING.md](CONTRIBUTING.md) の公開手順に従い、`.github/workflows/publish.yml` を使う。公開設定を変更するときは、ブランチ名と manifest バージョンの一致検証、公開前テスト、OIDC 認証を維持する。
 
 ## 実装上の制約
 
