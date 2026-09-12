@@ -5,8 +5,9 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { PassClient, PassError, checkCancellation } from './pass.mjs';
 import { reason, field } from './inputs.mjs';
+import { resolveCliPath } from './setup.mjs';
 
-const client = new PassClient({ executable: process.env.PASS_CLI_PATH,
+const client = new PassClient({ executable: resolveCliPath(),
   sessionDir: process.env.PROTON_PASS_SESSION_DIR });
 const { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 const server = new McpServer({ name: 'proton-pass', version });

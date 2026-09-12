@@ -4,6 +4,7 @@
 
 - 利用者向け手順は [README.md](README.md)、開発手順は [CONTRIBUTING.md](CONTRIBUTING.md)、実装の構造と判断は [DESIGN.md](DESIGN.md) を参照する。
 - MCP 入力・応答は `src/server.mjs`、理由とフィールド名のスキーマは `src/inputs.mjs`、CLI 呼び出しと検索は `src/pass.mjs` を変更する。変更時は各境界の契約と `test/pass.test.mjs`・`test/inputs.test.mjs` の対応を確認する。
+- 実行入口とサブコマンドは `src/cli.mjs`、Proton Pass CLIの検出・公式配布物の導入は `src/setup.mjs` を変更し、`test/cli.test.mjs`・`test/setup.test.mjs` で副作用境界を確認する。
 - Node.js 22 以降の JavaScript ESM と pnpm を使う。バージョンと配布設定の正本は `package.json`、依存解決の正本は `pnpm-lock.yaml` とする。
 - 依存更新の自動化は `.github/dependabot.yml` を正本とし、npm と GitHub Actions を週次で確認する。minor・patch 更新は ecosystem ごとにまとめ、major 更新は個別に扱う。
 

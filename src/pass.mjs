@@ -20,7 +20,7 @@ export async function runCli(executable, args, env, signal) {
     return stdout;
   } catch (error) {
     if (error.name === 'AbortError') throw new PassError('呼び出しをキャンセルしました。');
-    if (error.code === 'ENOENT') throw new PassError('PASS_CLI_PATH の実行ファイルが見つかりません。');
+    if (error.code === 'ENOENT') throw new PassError('pass-cli の実行ファイルが見つかりません。proton-pass-mcp setup を実行するか、PASS_CLI_PATH を確認してください。');
     if (error.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') throw new PassError('pass-cli の出力が上限（8 MiB）を超えました。');
     if (error.killed) throw new PassError('pass-cli がタイムアウトしました。再試行してください。');
     const stderr = error.stderr ?? '';
@@ -76,7 +76,8 @@ function shareRole(value) {
 
 export class PassClient {
   constructor({ executable, sessionDir, runner = runCli, env = process.env }) {
-    if (!executable || !sessionDir) throw new PassError('PASS_CLI_PATH と PROTON_PASS_SESSION_DIR を設定してください。');
+    if (!executable) throw new PassError('pass-cli が見つかりません。proton-pass-mcp setup を実行するか、PASS_CLI_PATH を設定してください。');
+    if (!sessionDir) throw new PassError('PROTON_PASS_SESSION_DIR を設定してください。');
     this.executable = executable;
     this.env = { ...env };
     // Windowsの環境変数名は大小文字を区別しない。指定セッションも一意にする。

@@ -4,7 +4,7 @@
   "description": "Read-only MCP server for an existing Proton Pass CLI session",
   "license": "MIT",
   "bin": {
-    "proton-pass-mcp": "src/server.mjs"
+    "proton-pass-mcp": "src/cli.mjs"
   },
   "files": ["src/", "CHANGELOG.md"],
   "repository": {
@@ -17,7 +17,7 @@
   },
   "type": "module",
   "scripts": {
-    "start": "node src/server.mjs",
+    "start": "node src/cli.mjs",
     "test": "node --test test/*.test.mjs",
     "verify": "node scripts/verify.mjs",
     "prepublishOnly": "pnpm test"
