@@ -32,13 +32,13 @@ npm install -g @kagayoi/proton-pass-mcp
 proton-pass-mcp setup
 ```
 
-`setup` はProton公式のstable manifestをHTTPSで取得し、現在のOS・CPUに対応する公式配布物をダウンロードします。manifestに記載されたSHA-256と実物が一致した場合だけ展開・配置し、一時ファイルは成功・失敗にかかわらず削除します。ログイン、PATの読み取り・保存、PATHの変更は行いません。
+`setup` はProton公式のstable manifestをHTTPSで取得し、現在のOS・CPUに対応する公式配布物をダウンロードします。manifestに記載されたSHA-256と実物が一致した場合だけ展開・配置し、復元不能時に案内する旧版バックアップを除いて一時ファイルを削除します。ログイン、PATの読み取り・保存、PATHの変更は行いません。
 
-`PASS_CLI_PATH` を指定した場合、MCP起動と通常の `setup` はその実行ファイルだけを利用します。指定先が無効でも公式の既定配置先や `PATH` へフォールバックせず、安全のため失敗します。省略した場合は公式の既定配置先、`PATH` の順に既存CLIを探し、見つかればダウンロードしません。最新版を公式の既定配置先へ明示的に再導入するときは、既存CLIの探索を省略する `--force` を使います。任意の配置先を使う場合は `--install-dir` を指定してください。
+`PASS_CLI_PATH` を指定した場合、MCP起動と `--force` を付けない `setup` はその実行ファイルだけを利用します。指定先が無効でも公式の既定配置先や `PATH` へフォールバックせず、安全のため失敗します。省略した場合は、指定した導入先（未指定なら公式の既定配置先）、`PATH` の順に既存CLIを探し、見つかればダウンロードしません。stable版を公式の既定配置先へ明示的に再導入するときは、既存CLIの探索を省略する `--force` を使います。任意の配置先への導入を保証する場合は `--force` と `--install-dir` を併用してください。
 
 ```powershell
 proton-pass-mcp setup --force
-proton-pass-mcp setup --install-dir 'D:\Tools\ProtonPass'
+proton-pass-mcp setup --force --install-dir 'D:\Tools\ProtonPass'
 proton-pass-mcp setup --help
 ```
 
