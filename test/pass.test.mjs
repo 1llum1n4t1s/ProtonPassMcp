@@ -18,7 +18,7 @@ function setup(override) {
       if (args[1] === 'list') return JSON.stringify({ items });
       if (args.some(arg => arg.startsWith('--field='))) return 'field-value\n';
       return JSON.stringify({ item: { content: { title: 'title', note:
-        args.includes('a') ? 'SECRET Keeperからインポート PRIVATE' : 'unrelated' } } });
+        args.includes('--item-id=a') ? 'SECRET Keeperからインポート PRIVATE' : 'unrelated' } } });
     } });
   return { client, calls, items };
 }
@@ -112,6 +112,29 @@ test('指定フィールド1つを理由付きで取得し共有IDも正しく�
   assert.equal(calls[1].env.PROTON_PASS_AGENT_REASON, 'explicit request');
   assert.equal((await client.shares()).shares[0].share_id, 'vault');
   assert.equal(JSON.stringify(await client.listItems({ share_id: 'vault' })).includes('password'), false);
+});
+
+test('オプションに見える共有IDとアイテムIDを値として単一引数で渡す', async () => {
+  const calls = [];
+  const client = new PassClient({ executable: 'fake', sessionDir: 'isolated',
+    runner: async (_, args) => {
+      calls.push(args);
+      if (args[0] === 'info') return '';
+      if (args[1] === 'list') return JSON.stringify({ items: [
+        { id: '--item', share_id: '--share', title: 'title', state: 'Active', item_type: 'note' },
+      ] });
+      if (args.some(arg => arg.startsWith('--field='))) return 'value\n';
+      return JSON.stringify({ item: { content: { title: 'title', note: 'match' } } });
+    } });
+
+  await client.listItems({ share_id: '--help' });
+  await client.searchNotes({ share_id: '--help', query: 'match', reason: 'test reason' });
+  await client.field({ share_id: '--help', item_id: '--version', field: 'password', reason: 'test reason' });
+
+  assert.ok(calls.some(args => args.includes('--share-id=--help')));
+  assert.ok(calls.some(args => args.includes('--share-id=--share') && args.includes('--item-id=--item')));
+  assert.ok(calls.some(args => args.includes('--share-id=--help') && args.includes('--item-id=--version')));
+  assert.equal(calls.some(args => args.includes('--share-id') || args.includes('--item-id')), false);
 });
 
 test('同時アクセスは直列化し失敗後も次を実行する', async () => {

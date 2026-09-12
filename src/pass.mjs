@@ -125,7 +125,7 @@ export class PassClient {
   }
 
   async items({ share_id, type, state = 'active' }, signal) {
-    const args = ['item', 'list', '--share-id', share_id, '--output', 'json'];
+    const args = ['item', 'list', `--share-id=${share_id}`, '--output', 'json'];
     if (type) args.push('--filter-type', type);
     if (state !== 'all') args.push('--filter-state', state);
     const data = await this.command(args, { signal });
@@ -161,8 +161,8 @@ export class PassClient {
     const page = items.slice(offset, offset + page_size);
     let checked = 0;
     for (const item of page) {
-      const data = await this.command(['item', 'view', '--share-id', item.share_id,
-        '--item-id', item.id, '--output', 'json'], { reason, signal });
+      const data = await this.command(['item', 'view', `--share-id=${item.share_id}`,
+        `--item-id=${item.id}`, '--output', 'json'], { reason, signal });
       const content = data.item?.content;
       if (typeof content?.note !== 'string' || typeof content.title !== 'string') {
         throw new PassError('ノートのJSON構造が想定と異なります。');
@@ -178,8 +178,8 @@ export class PassClient {
   }
 
   async field({ share_id, item_id, field, reason }, signal) {
-    const value = await this.command(['item', 'view', '--share-id', share_id,
-      '--item-id', item_id, `--field=${field}`], { reason, signal, json: false });
+    const value = await this.command(['item', 'view', `--share-id=${share_id}`,
+      `--item-id=${item_id}`, `--field=${field}`], { reason, signal, json: false });
     return { field, value: value.replace(/\r?\n$/, '') };
   }
 }

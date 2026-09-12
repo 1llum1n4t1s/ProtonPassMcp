@@ -18,7 +18,7 @@ test('カスタムフィールド名を変形せず単一引数で渡す', async
     const parsed = field.parse(name);
     const client = new PassClient({ executable: 'fake', sessionDir: 'fake', runner: async (_, args) => {
       if (args[0] === 'info') return '';
-      assert.deepEqual(args, ['item', 'view', '--share-id', 'vault', '--item-id', 'item', `--field=${name}`]);
+      assert.deepEqual(args, ['item', 'view', '--share-id=vault', '--item-id=item', `--field=${name}`]);
       const actual = await runCli(process.execPath, ['-e', 'process.stdout.write(JSON.stringify(process.argv.slice(1)))', '--', args.at(-1)], process.env);
       assert.deepEqual(JSON.parse(actual), [`--field=${name}`]);
       return 'dummy-value\n';
