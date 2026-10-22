@@ -23,6 +23,8 @@ MCP 入力 → スキーマ検証 → `exclusive` キュー → `PassClient` →
 
 CLI導入は通常のMCP起動から分離し、利用者が `setup` を明示した場合だけネットワークとファイルシステムを変更する。`PASS_CLI_PATH` は実行対象の固定指定として扱い、無効な場合は代替CLIへフォールバックせず失敗する。変数を省略した場合だけ、指定導入先（未指定なら公式の既定配置先）、`PATH` の順で既存CLIを探し、見つかった場合は `--force` がない限り再導入しない。このため `--install-dir` は導入が必要になった場合の配置先を選び、その場所への再導入を保証するには `--force` を併用する。MCP起動時も明示パス、公式の既定配置先、`PATH` の優先順を使う。
 
+導入先の確定は既存CLIの探索後まで遅延する。Windowsで `LOCALAPPDATA` が未設定の場合、既定配置先の探索を省略して `PATH` へ進むため、明示パスや既存CLIの再利用を妨げない。新規導入または `--force` では配置先が必要になり、既定配置先を決定できず `--install-dir` もない場合は失敗する。
+
 ## 検索とページング
 
 - アイテム一覧は ID 順へ整列し、タイトルを大文字小文字を区別せず部分一致で絞り込む。`offset` / `limit` で返し、続きは `next_offset` で示す。各呼び出しで一覧を再取得する。
@@ -45,6 +47,6 @@ CLI導入は通常のMCP起動から分離し、利用者が `setup` を明示�
 
 ## 配布と公開の境界
 
-`.github/workflows/publish.yml` が npm 公開を担う。`release/**` への push または手動実行を入口とし、公開ジョブは `release/` ブランチだけで動く。ブランチ名が `package.json` の `release/<version>` と一致することを検証してから、固定 lockfile による依存解決、配布内容の確認、公開へ進む。公開前テストは `package.json` の `prepublishOnly` に集約する。
+`.github/workflows/publish.yml` が npm 公開を担う。`release/**` への push または手動実行を入口とし、公開ジョブは `release/` ブランチだけで動く。ブランチ名が `package.json` の `release/<version>` と一致することを検証してから、固定 lockfile による依存解決、配布内容の確認、`pnpm test` へ進む。npmレジストリで同一バージョンが公開済みなら再公開を省略する。実際の `npm publish` でも `package.json` の `prepublishOnly` によりテストを実行する。
 
 公開ジョブは npm Trusted Publishing の OIDC 認証を使い、`id-token: write` 権限で provenance 付きのパッケージを公開する。長期保存する npm トークンを CI に持たせず、npm 側に登録したリポジトリ・workflow との信頼関係に依存する。公開処理は共通の concurrency グループで同時実行を抑え、進行中の公開を後続実行でキャンセルしない。この認証経路は MCP 実行時の Proton Pass セッションとは独立している。初回登録と実行手順は [CONTRIBUTING.md](CONTRIBUTING.md) を参照する。

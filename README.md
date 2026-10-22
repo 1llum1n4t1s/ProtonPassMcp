@@ -85,7 +85,7 @@ MCPクライアントには次のstdio設定を登録します。`PASS_CLI_PATH`
   "mcpServers": {
     "proton-pass": {
       "command": "npx",
-      "args": ["--yes", "@kagayoi/proton-pass-mcp@1.0.7"],
+      "args": ["--yes", "@kagayoi/proton-pass-mcp@1.0.8"],
       "env": {
         "PASS_CLI_PATH": "C:/Users/USER/AppData/Local/Programs/ProtonPass/pass-cli.exe",
         "PROTON_PASS_SESSION_DIR": "C:/Users/USER/AppData/Local/Kagayoi/ProtonPassMcp/session"
@@ -102,6 +102,8 @@ MCPクライアントには次のstdio設定を登録します。`PASS_CLI_PATH`
 `setup` が既存CLIを見つけられない場合は、`PASS_CLI_PATH` を指定しているなら、その値が正しい実行ファイルを指しているか確認します。自動検出を使うならこの変数を削除し、公式の既定配置先にファイルがあるか、現在のプロセスから `PATH` が見えるかを確認します。Windows ZIPの展開に失敗した場合はWindows PowerShellが利用できることと公式配布物の取得状態を確認してください。SHA-256検証に失敗した場合は検証を無効化せず、公式側のmanifestと配布物が一致してから再実行してください。
 
 更新途中の失敗では既存ファイルを自動復元します。復元にも失敗した場合は、エラーに表示された一時バックアップを削除せず、CLIを停止してから再実行するか、バックアップ内のファイルを導入先へ戻してください。
+
+Windowsで `LOCALAPPDATA` が未設定でも、`PASS_CLI_PATH` または `PATH` 上の既存CLIを利用できます。新規導入で既定の配置先を決定できない場合は、`LOCALAPPDATA` を設定するか、`setup --install-dir` で配置先を指定してください。
 
 ## ライセンス
 
