@@ -347,13 +347,11 @@ export async function runSetup(args = [], options = {}) {
   const arch = options.arch ?? process.arch;
   const env = options.env ?? process.env;
   const homedir = options.homedir ?? os.homedir();
-  const installDir = parsed.installDir ?? options.installDir
-    ?? defaultInstallDir({ platform, env, homedir });
-  const destinationDir = path.resolve(installDir);
+  const installDir = parsed.installDir ?? options.installDir;
   platformAssetKey(platform, arch);
 
   if (!parsed.force) {
-    const existing = resolveCliPath({ platform, env, homedir, installDir: destinationDir });
+    const existing = resolveCliPath({ platform, env, homedir, installDir });
     if (existing) {
       return {
         installed: false, executable: existing, version: null,
@@ -362,6 +360,7 @@ export async function runSetup(args = [], options = {}) {
     }
   }
 
+  const destinationDir = path.resolve(installDir ?? defaultInstallDir({ platform, env, homedir }));
   const fetchImpl = options.fetch ?? globalThis.fetch;
   if (typeof fetchImpl !== 'function') throw new SetupError('ダウンロード機能を利用できません。');
   const temporaryRoot = mkdtempSync(path.join(options.tmpdir ?? os.tmpdir(), 'proton-pass-mcp-setup-'));

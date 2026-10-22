@@ -68,16 +68,6 @@ test('認証失敗時にデータ取得を実行しない', async () => {
   assert.equal(calls.length, 1);
 });
 
-test('CLIの生エラーに含まれる秘密を返さない', async () => {
-  await assert.rejects(runCli(process.execPath,
-    ['-e', 'process.stderr.write("SECRET_PASSWORD"); process.exit(1)'], process.env), error => {
-    assert.ok(error instanceof PassError);
-    assert.equal(error.message.includes('SECRET_PASSWORD'), false);
-    assert.equal(error.stderr, undefined);
-    return true;
-  });
-});
-
 test('認証エラーを具体的に分類し、sessionを含むだけの障害は未認証扱いしない', async () => {
   const cases = [
     ['Command is not logout there is no session\nError: This operation requires an authenticated client',

@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
-import { chmod, copyFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, mkdir, mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
 import { statSync } from 'node:fs';
+import { removeFixture } from './cleanup-fixture.mjs';
 import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
@@ -56,40 +57,42 @@ test('公式マニフェストから対応platform/archの資産だけを選ぶ'
 
 test('PASS_CLI_PATHを固定指定として扱い、省略時だけ導入先とPATHを探索する', async t => {
   const root = await temporary();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const explicit = path.join(root, 'explicit', 'pass-cli');
+  t.after(() => removeFixture(root, { recursive: true, force: true }));
+  const platform = process.platform;
+  const executable = platform === 'win32' ? 'pass-cli.exe' : 'pass-cli';
+  const explicit = path.join(root, 'explicit', executable);
   const installedDir = path.join(root, 'installed');
-  const installed = path.join(installedDir, 'pass-cli');
+  const installed = path.join(installedDir, executable);
   const pathDir = path.join(root, 'path');
-  const pathCli = path.join(pathDir, 'pass-cli');
+  const pathCli = path.join(pathDir, executable);
   for (const filename of [explicit, installed, pathCli]) {
     await mkdir(path.dirname(filename), { recursive: true });
     await writeFile(filename, 'cli');
     await chmod(filename, 0o755);
   }
   const env = { PASS_CLI_PATH: explicit, PATH: pathDir };
-  assert.equal(resolveCliPath({ platform: 'linux', env, installDir: installedDir }), explicit);
-  await rm(explicit);
+  assert.equal(resolveCliPath({ platform, env, installDir: installedDir }), explicit);
+  await removeFixture(explicit);
   assert.throws(
-    () => resolveCliPath({ platform: 'linux', env, installDir: installedDir }),
+    () => resolveCliPath({ platform, env, installDir: installedDir }),
     error => error instanceof SetupError && /PASS_CLI_PATH/.test(error.message),
   );
   for (const invalid of ['', '   ']) {
     env.PASS_CLI_PATH = invalid;
     assert.throws(
-      () => resolveCliPath({ platform: 'linux', env, installDir: installedDir }),
+      () => resolveCliPath({ platform, env, installDir: installedDir }),
       error => error instanceof SetupError && /PASS_CLI_PATH/.test(error.message),
     );
   }
   delete env.PASS_CLI_PATH;
-  assert.equal(resolveCliPath({ platform: 'linux', env, installDir: installedDir }), installed);
-  await rm(installed);
-  assert.equal(resolveCliPath({ platform: 'linux', env, installDir: installedDir }), pathCli);
+  assert.equal(resolveCliPath({ platform, env, installDir: installedDir }), installed);
+  await removeFixture(installed);
+  assert.equal(resolveCliPath({ platform, env, installDir: installedDir }), pathCli);
 });
 
 test('無効なPASS_CLI_PATHでは代替CLIの検索もダウンロードも行わない', async t => {
   const root = await temporary();
-  t.after(() => rm(root, { recursive: true, force: true }));
+  t.after(() => removeFixture(root, { recursive: true, force: true }));
   const installDir = path.join(root, 'installed');
   const fallback = path.join(installDir, 'pass-cli');
   await mkdir(installDir);
@@ -106,7 +109,7 @@ test('無効なPASS_CLI_PATHでは代替CLIの検索もダウンロードも行�
 
 test('forceなしで既存CLIを再利用しダウンロードしない', async t => {
   const root = await temporary();
-  t.after(() => rm(root, { recursive: true, force: true }));
+  t.after(() => removeFixture(root, { recursive: true, force: true }));
   const executable = path.join(root, 'pass-cli');
   await writeFile(executable, 'existing');
   await chmod(executable, 0o755);
@@ -123,7 +126,7 @@ test('forceなしで既存CLIを再利用しダウンロードしない', async 
 
 test('Unix資産を検証して指定先へ755で導入し一時物を清掃する', async t => {
   const root = await temporary();
-  t.after(() => rm(root, { recursive: true, force: true }));
+  t.after(() => removeFixture(root, { recursive: true, force: true }));
   const installDir = path.join(root, 'install');
   const scratch = path.join(root, 'scratch');
   await mkdir(scratch);
@@ -145,7 +148,7 @@ test('Unix資産を検証して指定先へ755で導入し一時物を清掃す�
 
 test('Windows ZIP内の通常ファイルをすべて指定先へ配置する', async t => {
   const root = await temporary();
-  t.after(() => rm(root, { recursive: true, force: true }));
+  t.after(() => removeFixture(root, { recursive: true, force: true }));
   const installDir = path.join(root, 'install');
   const scratch = path.join(root, 'scratch');
   await mkdir(scratch);
@@ -167,7 +170,7 @@ test('Windows ZIP内の通常ファイルをすべて指定先へ配置する', 
 
 test('Windows ZIPの展開失敗を専用エラーへ分類して一時物を清掃する', async t => {
   const root = await temporary();
-  t.after(() => rm(root, { recursive: true, force: true }));
+  t.after(() => removeFixture(root, { recursive: true, force: true }));
   const scratch = path.join(root, 'scratch');
   await mkdir(scratch);
   const archive = Buffer.from('fake zip bytes');
@@ -184,7 +187,7 @@ test('Windows ZIPの展開失敗を専用エラーへ分類して一時物を清
 
 test('Windowsの複数ファイル更新に失敗した場合は既存版を復元する', async t => {
   const root = await temporary();
-  t.after(() => rm(root, { recursive: true, force: true }));
+  t.after(() => removeFixture(root, { recursive: true, force: true }));
   const installDir = path.join(root, 'install');
   const scratch = path.join(root, 'scratch');
   await mkdir(installDir);
@@ -213,7 +216,7 @@ test('Windowsの複数ファイル更新に失敗した場合は既存版を復�
 
 test('Windowsの復元にも失敗した場合は旧版バックアップを保持する', async t => {
   const root = await temporary();
-  t.after(() => rm(root, { recursive: true, force: true }));
+  t.after(() => removeFixture(root, { recursive: true, force: true }));
   const installDir = path.join(root, 'install');
   const scratch = path.join(root, 'scratch');
   await mkdir(installDir);
@@ -249,7 +252,7 @@ test('Windowsの復元にも失敗した場合は旧版バックアップを保�
 
 test('SHA改ざんでは既存の導入先を変更せず一時物を清掃する', async t => {
   const root = await temporary();
-  t.after(() => rm(root, { recursive: true, force: true }));
+  t.after(() => removeFixture(root, { recursive: true, force: true }));
   const installDir = path.join(root, 'install');
   const scratch = path.join(root, 'scratch');
   const executable = path.join(installDir, 'pass-cli');
@@ -283,7 +286,7 @@ test('危険URLと不正SHAをマニフェスト段階で拒否する', () => {
 
 test('Content-Lengthと実受信量のサイズ上限を超えた取得を拒否して清掃する', async t => {
   const root = await temporary();
-  t.after(() => rm(root, { recursive: true, force: true }));
+  t.after(() => removeFixture(root, { recursive: true, force: true }));
   for (const contentLength of [true, false]) {
     const scratch = path.join(root, contentLength ? 'header' : 'stream');
     await mkdir(scratch);
@@ -302,7 +305,7 @@ test('Content-Lengthと実受信量のサイズ上限を超えた取得を拒否
 
 test('manifest取得と資産取得の両方へタイムアウトを設定する', async t => {
   const root = await temporary();
-  t.after(() => rm(root, { recursive: true, force: true }));
+  t.after(() => removeFixture(root, { recursive: true, force: true }));
   const scratch = path.join(root, 'scratch');
   await mkdir(scratch);
   const asset = Buffer.from('asset');
