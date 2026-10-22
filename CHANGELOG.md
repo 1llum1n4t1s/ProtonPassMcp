@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.8 - 2026-10-22
+
+- Windowsで `LOCALAPPDATA` が未設定でも、`setup` が `PASS_CLI_PATH` または `PATH` 上の既存CLIを再利用できるようにしました。
+- アクセス理由とフィールド名の文字数をUnicodeコードポイント数で数えることを、利用手順で明確にしました。
+
 ## 1.0.7 - 2026-09-13
 
 - `proton-pass-mcp setup` でProton公式のCLIを取得し、SHA-256を検証して安全に導入できるようにしました。
