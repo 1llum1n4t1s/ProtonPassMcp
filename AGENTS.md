@@ -15,7 +15,7 @@
 - 実装を変更したときは `pnpm test` を実行し、認証失敗、秘密の出力抑制、検索カーソル、直列実行の契約を維持する。テストデータと CLI runner の差し替えを使って確認する。
 - MCP 接続を実セッションで検証するときは、利用可能な `PASS_CLI_PATH` と `PROTON_PASS_SESSION_DIR` を設定して `pnpm verify` を実行する。この検証はアクセス可能な保管庫が1件以上あることを前提とする。
 - 配布内容を変更したときは `npm pack --dry-run` で同梱対象を確認する。公開時の `prepublishOnly` は `pnpm test` を実行する。開発コマンドの詳細は CONTRIBUTING を参照する。
-- リリース作業では [CONTRIBUTING.md](CONTRIBUTING.md) の公開手順に従い、`.github/workflows/publish.yml` を使う。公開設定を変更するときは、ブランチ名と manifest バージョンの一致検証、公開前テスト、OIDC 認証を維持する。
+- リリース作業では [CONTRIBUTING.md](CONTRIBUTING.md) の公開手順に従い、`.github/workflows/publish.yml` を使う。README の MCP 設定例にあるパッケージの固定バージョンを `package.json` と揃え、npm に同梱される README も確認する。公開設定を変更するときは、ブランチ名と manifest バージョンの一致検証、公開前テスト、OIDC 認証を維持する。
 
 ## 実装上の制約
 
@@ -23,5 +23,5 @@
 - MCP からの `pass-cli` 実行は `runCli` を経由し、引数配列と `shell: false`、タイムアウト、出力上限、キャンセル伝播を維持する。
 - 一覧と検索結果は許可したメタデータだけを返し、秘密値が必要な取得は理由付きの `read_field` を使う。CLI の生エラーは分類した `PassError` に置き換える。
 - 認証は既存セッションを参照する。子プロセス環境から PAT と継承された理由を除き、必要な呼び出しだけに今回の理由を渡す。
-- CLI の導入は明示的な `setup` だけで行う。`PASS_CLI_PATH` の固定指定、公式 HTTPS URL と SHA-256 の検証、既存ファイルの復元、一時物の清掃を維持し、ログイン・PAT・セッション・PATHを変更しない。設計上の理由と例外は [DESIGN.md](DESIGN.md#不変条件と設計上の選択) を参照する。
+- CLI の導入は明示的な `setup` だけで行う。MCP 起動と `--force` なしの `setup` では `PASS_CLI_PATH` の固定指定を維持し、`setup --force` では既存CLIの探索を省略する。公式 HTTPS URL と SHA-256 の検証、既存ファイルの復元、一時物の清掃を維持し、ログイン・PAT・セッション・PATHを変更しない。設計上の理由は [DESIGN.md](DESIGN.md#不変条件と設計上の選択) を参照する。
 - 利用方法の変更は README、構造・不変条件の変更は DESIGN、作業手順の変更は本書または CONTRIBUTING の該当箇所へ反映する。
