@@ -85,7 +85,7 @@ MCPクライアントには次のstdio設定を登録します。`PASS_CLI_PATH`
   "mcpServers": {
     "proton-pass": {
       "command": "npx",
-      "args": ["--yes", "@kagayoi/proton-pass-mcp@1.0.8"],
+      "args": ["--yes", "@kagayoi/proton-pass-mcp@1.0.9"],
       "env": {
         "PASS_CLI_PATH": "C:/Users/USER/AppData/Local/Programs/ProtonPass/pass-cli.exe",
         "PROTON_PASS_SESSION_DIR": "C:/Users/USER/AppData/Local/Kagayoi/ProtonPassMcp/session"

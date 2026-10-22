@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.9 - 2026-10-22
+
+- npm同梱READMEのMCP設定例を公開バージョンに揃え、旧バージョンが起動される問題を解消しました。
+- Windowsで `LOCALAPPDATA` が未設定の場合の、既存CLIを使う設定方法を明確にしました。
+
 ## 1.0.8 - 2026-10-22
 
 - Windowsで `LOCALAPPDATA` が未設定でも、`setup` が `PASS_CLI_PATH` または `PATH` 上の既存CLIを再利用できるようにしました。
