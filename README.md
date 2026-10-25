@@ -48,14 +48,14 @@ await withFieldHandoff(receipt, async value => {
 
 補助関数は一度だけファイルを取得できるようにし、コールバックの成功・失敗にかかわらず使用後に削除します。コールバックの戻り値や生の例外も外へ返しません。通常の返却値は `{ consumed: true }` です。
 
-この変更を含む配布版の公開までは、下記のようにソース版を起動します。既存の公開版に環境変数を追加するだけでは、この機能は使えません。`PROTON_PASS_DISABLE_SECRET_READ=1` は会話へ平文を返す `read_field` だけを無効化し、ファイル受け渡しは引き続き使えます。既存の `PROTON_PASS_ACCESS_POLICY` も併用できます。
+ファイル受け渡しは1.0.10以降で使えます。下記の設定で公開版を起動します。`PROTON_PASS_DISABLE_SECRET_READ=1` は会話へ平文を返す `read_field` だけを無効化し、ファイル受け渡しは引き続き使えます。既存の `PROTON_PASS_ACCESS_POLICY` も併用できます。
 
 ```json
 {
   "mcpServers": {
     "proton-pass": {
-      "command": "node",
-      "args": ["D:/Dev/ProtonPassMcp/src/cli.mjs"],
+      "command": "npx",
+      "args": ["--yes", "@kagayoi/proton-pass-mcp@1.0.10"],
       "env": {
         "PASS_CLI_PATH": "C:/Users/USER/AppData/Local/Programs/ProtonPass/pass-cli.exe",
         "PROTON_PASS_SESSION_DIR": "C:/Users/USER/AppData/Local/Kagayoi/ProtonPassMcp/session",
@@ -98,14 +98,14 @@ MCP側でも `PROTON_PASS_ACCESS_POLICY` に次のようなJSONを指定でき�
 
 `SHARE_ID`・`ITEM_ID` は `list_vaults` / `list_shares` / `list_items` で確認して置き換えます。`fields` は保存されたアイテムで使う正確なフィールド名です。設定変更後はMCPサーバーを再起動してください。
 
-この変更を含む配布版が公開されるまでは、リポジトリの依存を準備したうえで、次のソース起動例を使ってください。既存の公開版へ環境変数を追加するだけでは制限されません。パスとIDは自分の配置先・許可するアイテムへ置き換えます。
+取得制限は1.0.10以降で使えます。次の設定で公開版を起動します。パスとIDは自分の配置先・許可するアイテムへ置き換えます。
 
 ```json
 {
   "mcpServers": {
     "proton-pass": {
-      "command": "node",
-      "args": ["D:/Dev/ProtonPassMcp/src/cli.mjs"],
+      "command": "npx",
+      "args": ["--yes", "@kagayoi/proton-pass-mcp@1.0.10"],
       "env": {
         "PASS_CLI_PATH": "C:/Users/USER/AppData/Local/Programs/ProtonPass/pass-cli.exe",
         "PROTON_PASS_SESSION_DIR": "C:/Users/USER/AppData/Local/Kagayoi/ProtonPassMcp/session",
@@ -196,7 +196,7 @@ MCPクライアントには次のstdio設定を登録します。`PASS_CLI_PATH`
   "mcpServers": {
     "proton-pass": {
       "command": "npx",
-      "args": ["--yes", "@kagayoi/proton-pass-mcp@1.0.9"],
+      "args": ["--yes", "@kagayoi/proton-pass-mcp@1.0.10"],
       "env": {
         "PASS_CLI_PATH": "C:/Users/USER/AppData/Local/Programs/ProtonPass/pass-cli.exe",
         "PROTON_PASS_SESSION_DIR": "C:/Users/USER/AppData/Local/Kagayoi/ProtonPassMcp/session"

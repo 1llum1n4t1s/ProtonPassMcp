@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.10 - 2026-10-25
+
+- 秘密値をMCP応答へ含めず、一時ファイルからブラウザへ入力する `create_field_handoff` と `release_field_handoff` を追加しました。使用後・期限切れ・異常終了時に回収します。
+- `PROTON_PASS_ACCESS_POLICY` で取得可能なアイテム・フィールド・有効期限・1分間の取得回数を制限できるようになりました。
+- `PROTON_PASS_DISABLE_SECRET_READ=1` で、値を応答へ返す `read_field` を無効化し、ファイル受け渡しだけを利用できるようになりました。
+
 ## 1.0.9 - 2026-10-22
 
 - npm同梱READMEのMCP設定例を公開バージョンに揃え、旧バージョンが起動される問題を解消しました。
