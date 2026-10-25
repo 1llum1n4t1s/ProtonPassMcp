@@ -4,6 +4,7 @@
 
 - 利用者向け手順は [README.md](README.md)、開発手順は [CONTRIBUTING.md](CONTRIBUTING.md)、実装の構造と判断は [DESIGN.md](DESIGN.md) を参照する。
 - MCP 入力・応答は `src/server.mjs`、理由とフィールド名のスキーマは `src/inputs.mjs`、CLI 呼び出しと検索は `src/pass.mjs` を変更する。変更時は各境界の契約と `test/pass.test.mjs`・`test/inputs.test.mjs` の対応を確認する。
+- 取得制限は `src/access-policy.mjs` を正本とし、変更時は [CONTRIBUTING.md](CONTRIBUTING.md) のダミーCLIによる実stdio検証で、許可集合・期限・取得回数と一覧の絞り込みを確認する。
 - 実行入口とサブコマンドは `src/cli.mjs`、Proton Pass CLIの検出・公式配布物の導入は `src/setup.mjs` を変更し、`test/cli.test.mjs`・`test/setup.test.mjs` で副作用境界を確認する。
 - 一時フィールドの受け渡しは `src/handoff-*.mjs` を変更する。Windows ACL、排他利用、使用後・期限・異常終了時の回収をダミーのMCP接続と実IABで確認する。作成・回収ツールのローカル書込みは `readOnlyHint: false` で表し、Proton側の操作は読み取り専用を維持する。
 - Node.js 22 以降の JavaScript ESM と pnpm を使う。バージョンと配布設定の正本は `package.json`、依存解決の正本は `pnpm-lock.yaml` とする。
@@ -14,9 +15,9 @@
 - 依存を準備するときは `pnpm install --frozen-lockfile` を実行する。
 - npm 依存を更新したときは `package.json` と `pnpm-lock.yaml` を同期し、GitHub Actions を更新したときは commit SHA の固定を維持する。いずれも `pnpm test` を実行する。
 - 実装を変更したときは `pnpm test` を実行し、認証失敗、秘密の出力抑制、検索カーソル、直列実行の契約を維持する。テストデータと CLI runner の差し替えを使って確認する。
-- MCP 接続を実セッションで検証するときは、利用可能な `PASS_CLI_PATH` と `PROTON_PASS_SESSION_DIR` を設定して `pnpm verify` を実行する。この検証はアクセス可能な保管庫が1件以上あることを前提とする。
+- MCP 接続を実セッションで検証するときは、利用可能な `PASS_CLI_PATH` と `PROTON_PASS_SESSION_DIR` を設定して `pnpm verify` を実行する。取得ポリシー未設定時はアクセス可能な保管庫が1件以上必要で、設定時は空の保管庫一覧も許容する。検証範囲と設定別の条件は [CONTRIBUTING.md](CONTRIBUTING.md) を参照する。
 - 配布内容を変更したときは `npm pack --dry-run` で同梱対象を確認する。公開時の `prepublishOnly` は `pnpm test` を実行する。開発コマンドの詳細は CONTRIBUTING を参照する。
-- リリース作業では [CONTRIBUTING.md](CONTRIBUTING.md) の公開手順に従い、`.github/workflows/publish.yml` を使う。README の MCP 設定例にあるパッケージの固定バージョンを `package.json` と揃え、npm に同梱される README も確認する。公開設定を変更するときは、ブランチ名と manifest バージョンの一致検証、公開前テスト、OIDC 認証を維持する。
+- リリース作業では [CONTRIBUTING.md](CONTRIBUTING.md) の公開手順に従い、`.github/workflows/publish.yml` を使う。README の MCP 設定例にあるパッケージの固定バージョンを `package.json` と揃え、npm に同梱される README も確認する。公開設定を変更するときは、ブランチ名と manifest バージョンの一致検証、公開前テスト、OIDC 認証と、内容・SHA-512を検証した同一アーカイブの公開を維持する。
 - このリポジトリの `/vava` には、公開後のこのPCのToolport専用runtime更新と、既存のProton Pass認証設定を使った実セッション検証を含める。[Toolport側の更新と接続確認](CONTRIBUTING.md#toolport側の更新と接続確認)に従い、公開したバージョンの導入、`pnpm verify`、ラッパーのバージョン確認、Toolport経由の実ツール呼び出しまでを完了条件とする。このローカルruntimeはGit参照元とは別の明示的な更新対象であり、`consumerUpdates.targets` が未設定でも省略しない。再接続待ちは同じバージョンの未完了工程として引き継ぐ。
 
 ## 実装上の制約
