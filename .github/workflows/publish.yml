@@ -28,7 +28,7 @@ jobs:
         with:
           node-version: '24'
       - name: Prepare package tools
-        run: npm install --global npm@11 pnpm@11.4.0
+        run: npm install --global npm@12 pnpm@12.15.0
       - name: Check release version
         run: |
           node --input-type=module <<'JS'
@@ -41,6 +41,33 @@ jobs:
       - name: Check package contents
         run: npm pack --dry-run
       - run: pnpm test
+      - name: Package and verify publish artifact
+        id: package
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { execFileSync } from 'node:child_process';
+          import { createHash } from 'node:crypto';
+          import { appendFileSync, readFileSync } from 'node:fs';
+          import path from 'node:path';
+          const manifest = JSON.parse(readFileSync('package.json', 'utf8'));
+          const packed = JSON.parse(execFileSync('npm', ['pack', '--json', '--pack-destination', process.env.RUNNER_TEMP], { encoding: 'utf8' }));
+          const [artifact] = Array.isArray(packed) ? packed : Object.values(packed);
+          const filename = path.join(process.env.RUNNER_TEMP, artifact.filename);
+          const { integrity } = artifact;
+          const archive = JSON.parse(execFileSync('tar', ['-xOf', filename, 'package/package.json'], { encoding: 'utf8' }));
+          assert.equal(archive.name, manifest.name);
+          assert.equal(archive.version, manifest.version);
+          const files = execFileSync('tar', ['-tzf', filename], { encoding: 'utf8' }).trim().split('\n');
+          for (const required of ['package.json', 'README.md', 'CHANGELOG.md', 'src/cli.mjs', 'src/server.mjs', 'src/handoff-consumer.mjs']) {
+            assert.ok(files.includes(`package/${required}`), `Missing package file: ${required}`);
+          }
+          const readme = execFileSync('tar', ['-xOf', filename, 'package/README.md'], { encoding: 'utf8' });
+          assert.ok(readme.includes(`${manifest.name}@${manifest.version}`));
+          assert.equal(`sha512-${createHash('sha512').update(readFileSync(filename)).digest('base64')}`, integrity);
+          console.log(JSON.stringify({ name: archive.name, version: archive.version, filename, integrity }));
+          appendFileSync(process.env.GITHUB_OUTPUT, `filename=${filename}\nintegrity=${integrity}\n`);
+          JS
       - name: Check published version
         id: registry
         run: |
@@ -53,4 +80,14 @@ jobs:
           JS
       - name: Publish with OIDC
         if: steps.registry.outputs.published != 'true'
-        run: npm publish --access public --provenance --registry=https://registry.npmjs.org/
+        env:
+          PACKAGE_FILE: ${{ steps.package.outputs.filename }}
+          EXPECTED_INTEGRITY: ${{ steps.package.outputs.integrity }}
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { createHash } from 'node:crypto';
+          import { readFileSync } from 'node:fs';
+          assert.equal(`sha512-${createHash('sha512').update(readFileSync(process.env.PACKAGE_FILE)).digest('base64')}`, process.env.EXPECTED_INTEGRITY);
+          JS
+          npm publish "$PACKAGE_FILE" --access public --provenance --registry=https://registry.npmjs.org/
