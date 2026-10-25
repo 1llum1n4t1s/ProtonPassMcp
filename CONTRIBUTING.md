@@ -9,9 +9,15 @@ pnpm test
 
 `pnpm test` は認証失敗・検索続行・秘密の出力抑制などをダミーデータで確認します。
 `PASS_CLI_PATH` と `PROTON_PASS_SESSION_DIR` を認証済みセッションに設定した `pnpm verify` は、実セッションでMCP接続・一覧・入力検証を確認します。
+`PROTON_PASS_DISABLE_SECRET_READ=1` でも同じコマンドを実行でき、7ツールの登録と、有効な引数で `read_field` を直接呼んでも拒否されることを確認します。未設定・`0` では8ツールを提供します。一時ファイル2ツールだけはローカル書込みを行うことも確認します。秘密値や実ファイルは取得・作成せず、作成の不正入力と未知IDの回収を検証します。検証の起動先は利用者と同じ `src/cli.mjs` です。
+`PROTON_PASS_ACCESS_POLICY` を設定した場合は、許可された共有だけが一覧へ出ることと、最初の許可共有のアイテム一覧が許可範囲内であることも確認します。単一アイテムの共有や空の許可一覧では保管庫一覧が空でも検証できます。未設定時は従来どおりアクセス可能な保管庫が1件以上必要です。有効期限内の設定を使ってください。このコマンドは許可されたパスワード自体を読みません。
+
+取得制限を変更した場合は、ダミーのCLIを使い、実際の `src/cli.mjs` をstdio MCPクライアントから起動して確認します。許可したフィールドの取得成功、許可外アイテム・フィールドとノート本文検索のCLI実行前拒否、一覧を絞った後のページング、並行取得の回数制限、失敗時の回数消費、待機中の取消、認証中・取得中の期限切れ、不正設定での起動拒否を確認します。制限なしの互換動作と、`PROTON_PASS_DISABLE_SECRET_READ=1` との併用も対象です。実Proton側のPAT権限や、接続先ブラウザでのログイン成功は、このダミー検証とは別です。
 ソースからの起動は同じ環境変数を設定して `pnpm start` を使います。
 
-公開は `.github/workflows/publish.yml` からnpm Trusted Publishing（OIDC）を使います。`package.json` と一致する `release/<version>` ブランチをpushすると、依存解決・配布確認・テストを実行し、未公開のバージョンをnpmへ公開します。再開時は同じブランチを指定してworkflow_dispatchを実行します。初回の手動公開などで公開済みのバージョンは再公開を省略します。
+ファイル受け渡しを変更した場合は、Windows実機で現在ユーザーだけのprotected ACLと、安全でない既存領域での取得前拒否を確認します。ダミーCLIを実stdio MCPから呼び、会話へ値が出ないこと、consumerを実IABで読み込んだ入力成功、使用後の不存在、二重使用・コールバック例外・期限切れ・キャンセルでの回収を確認します。サーバー強制終了、監視プロセス単独終了、両方終了後の次回起動時の回収も対象です。実パスワードを検証ログやfixtureへ保存しません。
+
+公開は `.github/workflows/publish.yml` からnpm Trusted Publishing（OIDC）を使います。`package.json` と一致する `release/<version>` ブランチをpushすると、依存解決・配布確認・テストを実行します。生成したnpmアーカイブの名前・バージョン・必須ファイル・READMEの固定バージョン・SHA-512を確認してから、その同じアーカイブを公開します。再開時は同じブランチを指定してworkflow_dispatchを実行します。初回の手動公開などで公開済みのバージョンは再公開を省略します。
 
 npm側の初回設定は、パッケージのTrusted PublisherにGitHub Actionsを選び、ユーザー `1llum1n4t1s`、リポジトリ `ProtonPassMcp`、Workflow filename `publish.yml` を登録します。Environmentは空欄にし、Allowed actionsで `npm publish` による直接公開を許可します。この登録時は本人認証が必要ですが、以降のCI公開でnpmトークンや対話認証は不要です。
 

@@ -75,19 +75,20 @@ function shareRole(value) {
 }
 
 export class PassClient {
-  constructor({ executable, sessionDir, runner = runCli, env = process.env }) {
+  constructor({ executable, sessionDir, runner = runCli, env = process.env, policy }) {
     if (!executable) throw new PassError('pass-cli が見つかりません。proton-pass-mcp setup を実行するか、PASS_CLI_PATH を設定してください。');
     if (!sessionDir) throw new PassError('PROTON_PASS_SESSION_DIR を設定してください。');
     this.executable = executable;
     this.env = { ...env };
     // Windowsの環境変数名は大小文字を区別しない。指定セッションも一意にする。
     for (const key of Object.keys(this.env)) {
-      if (['PROTON_PASS_PERSONAL_ACCESS_TOKEN', 'PROTON_PASS_AGENT_REASON', 'PROTON_PASS_SESSION_DIR'].includes(key.toUpperCase())) {
+      if (['PROTON_PASS_PERSONAL_ACCESS_TOKEN', 'PROTON_PASS_AGENT_REASON', 'PROTON_PASS_SESSION_DIR', 'PROTON_PASS_ACCESS_POLICY'].includes(key.toUpperCase())) {
         delete this.env[key];
       }
     }
     this.env.PROTON_PASS_SESSION_DIR = sessionDir;
     this.runner = runner;
+    this.policy = policy;
     this.queue = Promise.resolve();
   }
 
@@ -98,21 +99,31 @@ export class PassClient {
   }
 
   async info(signal) {
+    checkCancellation(signal);
     await this.runner(this.executable, ['info'], this.env, signal);
+    checkCancellation(signal);
     return { authenticated: true };
   }
 
   async command(args, { reason, signal, json = true } = {}) {
+    checkCancellation(signal);
+    this.policy?.assertActive();
     await this.info(signal);
+    checkCancellation(signal);
+    this.policy?.assertActive();
     const env = { ...this.env };
     if (reason) env.PROTON_PASS_AGENT_REASON = reason;
     const raw = await this.runner(this.executable, args, env, signal);
-    return json ? decode(raw) : raw;
+    const result = json ? decode(raw) : raw;
+    checkCancellation(signal);
+    this.policy?.assertActive();
+    return result;
   }
 
   async vaults(signal) {
     const data = await this.command(['vault', 'list', '--output', 'json'], { signal });
-    return { vaults: array(data?.vaults).map(v => strings(v, ['name', 'share_id'])) };
+    return { vaults: array(data?.vaults).map(v => strings(v, ['name', 'share_id']))
+      .filter(v => !this.policy || this.policy.allowsShare(v.share_id)) };
   }
 
   async shares(signal) {
@@ -122,26 +133,32 @@ export class PassClient {
       const value = strings(s, ['id', 'name', 'share_type']);
       if (!['Vault', 'Item'].includes(value.share_type)) throw new PassError('pass-cliのJSON構造が想定と異なります。');
       return { share_id: value.id, name: value.name, share_type: value.share_type, share_role: shareRole(s.share_role) };
-    }) };
+    }).filter(s => !this.policy || this.policy.allowsShare(s.share_id)) };
   }
 
   async items({ share_id, type, state = 'active' }, signal) {
+    checkCancellation(signal);
+    this.policy?.assertShare(share_id);
     const args = ['item', 'list', `--share-id=${share_id}`, '--output', 'json'];
     if (type) args.push('--filter-type', type);
     if (state !== 'all') args.push('--filter-state', state);
     const data = await this.command(args, { signal });
-    return array(data?.items).map(metadata).sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+    return array(data?.items).map(metadata)
+      .filter(item => !this.policy || (item.share_id === share_id && this.policy.allowsItem(share_id, item.id)))
+      .sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
   }
 
   async listItems(input, signal) {
     const items = await this.items(input, signal);
     const { offset = 0, limit = 100, query = '' } = input;
-    const filtered = items.filter(i => i.title.toLowerCase().includes(query.toLowerCase()));
+    const normalizedQuery = query.toLowerCase();
+    const filtered = items.filter(i => i.title.toLowerCase().includes(normalizedQuery));
     return { items: filtered.slice(offset, offset + limit), total: filtered.length,
       next_offset: offset + limit < filtered.length ? offset + limit : null };
   }
 
   async searchNotes(input, signal) {
+    if (this.policy) throw new PassError('アクセス設定が有効な間はノート本文検索を使用できません。タイトル検索を使用してください。');
     const started = Date.now();
     const { query, reason, cursor, page_size = 3 } = input;
     const items = await this.items({ ...input, type: 'note' }, signal);
@@ -179,8 +196,13 @@ export class PassClient {
   }
 
   async field({ share_id, item_id, field, reason }, signal) {
+    checkCancellation(signal);
+    this.policy?.consumeRead(share_id, item_id, field);
     const value = await this.command(['item', 'view', `--share-id=${share_id}`,
       `--item-id=${item_id}`, `--field=${field}`], { reason, signal, json: false });
-    return { field, value: value.replace(/\r?\n$/, '') };
+    const result = { field, value: value.replace(/\r?\n$/, '') };
+    checkCancellation(signal);
+    this.policy?.assertActive();
+    return result;
   }
 }

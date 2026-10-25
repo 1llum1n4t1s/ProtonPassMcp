@@ -5,6 +5,7 @@
 - 利用者向け手順は [README.md](README.md)、開発手順は [CONTRIBUTING.md](CONTRIBUTING.md)、実装の構造と判断は [DESIGN.md](DESIGN.md) を参照する。
 - MCP 入力・応答は `src/server.mjs`、理由とフィールド名のスキーマは `src/inputs.mjs`、CLI 呼び出しと検索は `src/pass.mjs` を変更する。変更時は各境界の契約と `test/pass.test.mjs`・`test/inputs.test.mjs` の対応を確認する。
 - 実行入口とサブコマンドは `src/cli.mjs`、Proton Pass CLIの検出・公式配布物の導入は `src/setup.mjs` を変更し、`test/cli.test.mjs`・`test/setup.test.mjs` で副作用境界を確認する。
+- 一時フィールドの受け渡しは `src/handoff-*.mjs` を変更する。Windows ACL、排他利用、使用後・期限・異常終了時の回収をダミーのMCP接続と実IABで確認する。作成・回収ツールのローカル書込みは `readOnlyHint: false` で表し、Proton側の操作は読み取り専用を維持する。
 - Node.js 22 以降の JavaScript ESM と pnpm を使う。バージョンと配布設定の正本は `package.json`、依存解決の正本は `pnpm-lock.yaml` とする。
 - 依存更新の自動化は `.github/dependabot.yml` を正本とし、npm と GitHub Actions を週次で確認する。minor・patch 更新は ecosystem ごとにまとめ、major 更新は個別に扱う。
 
@@ -22,7 +23,7 @@
 
 - ツール追加・変更時は strict な入力スキーマ、読み取り専用の CLI 操作、ツール単位の直列実行を維持する。
 - MCP からの `pass-cli` 実行は `runCli` を経由し、引数配列と `shell: false`、タイムアウト、出力上限、キャンセル伝播を維持する。
-- 一覧と検索結果は許可したメタデータだけを返し、秘密値が必要な取得は理由付きの `read_field` を使う。CLI の生エラーは分類した `PassError` に置き換える。
+- 一覧と検索結果は許可したメタデータだけを返し、秘密値が必要な取得は理由付きの `read_field` または `create_field_handoff` を使う。ファイル方式は秘密をMCP応答に含めず、consumerも値・コールバック結果・生例外を表示しない。CLI の生エラーは分類した `PassError` に置き換える。
 - 認証は既存セッションを参照する。子プロセス環境から PAT と継承された理由を除き、必要な呼び出しだけに今回の理由を渡す。
 - CLI の導入は明示的な `setup` だけで行う。MCP 起動と `--force` なしの `setup` では `PASS_CLI_PATH` の固定指定を維持し、`setup --force` では既存CLIの探索を省略する。公式 HTTPS URL と SHA-256 の検証、既存ファイルの復元、一時物の清掃を維持し、ログイン・PAT・セッション・PATHを変更しない。設計上の理由は [DESIGN.md](DESIGN.md#不変条件と設計上の選択) を参照する。
 - 利用方法の変更は README、構造・不変条件の変更は DESIGN、作業手順の変更は本書または CONTRIBUTING の該当箇所へ反映する。

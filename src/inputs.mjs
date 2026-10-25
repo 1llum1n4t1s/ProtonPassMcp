@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+export const id = z.string().min(1).max(512).regex(/^[A-Za-z0-9_+=-]+$/);
+
 // pass-cliはRustのchars().count()でUnicodeコードポイント数を数える。
 export const reason = z.string().trim().min(5)
   .refine(value => [...value].length <= 300, '理由は300文字以内で指定してください。')
