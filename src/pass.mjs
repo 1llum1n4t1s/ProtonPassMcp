@@ -14,7 +14,8 @@ export async function runCli(executable, args, env, signal) {
   try {
     const { stdout } = await execute(executable, args, {
       env, signal, windowsHide: true, shell: false,
-      timeout: args[0] === 'info' ? 5000 : 20000, maxBuffer: 8 * 1024 * 1024,
+      // infoも初期化とAPI通信を行うため、他のCLI操作と同じ実行予算を確保する。
+      timeout: 20000, maxBuffer: 8 * 1024 * 1024,
       encoding: 'utf8',
     });
     return stdout;

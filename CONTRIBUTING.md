@@ -17,7 +17,15 @@ pnpm test
 
 ファイル受け渡しを変更した場合は、Windows実機で現在ユーザーだけのprotected ACLと、安全でない既存領域での取得前拒否を確認します。ダミーCLIを実stdio MCPから呼び、会話へ値が出ないこと、consumerを実IABで読み込んだ入力成功、使用後の不存在、二重使用・コールバック例外・期限切れ・キャンセルでの回収を確認します。サーバー強制終了、監視プロセス単独終了、両方終了後の次回起動時の回収も対象です。実パスワードを検証ログやfixtureへ保存しません。
 
-公開は `.github/workflows/publish.yml` からnpm Trusted Publishing（OIDC）を使います。`package.json` と一致する `release/<version>` ブランチをpushすると、依存解決・配布確認・テストを実行します。生成したnpmアーカイブの名前・バージョン・必須ファイル・READMEの固定バージョン・SHA-512を確認してから、その同じアーカイブを公開します。再開時は同じブランチを指定してworkflow_dispatchを実行します。初回の手動公開などで公開済みのバージョンは再公開を省略します。
+公開は `.github/workflows/publish.yml` からnpm Trusted Publishing（OIDC）を使います。`package.json` と一致する `release/<version>` ブランチをpushすると、依存解決・配布確認・テストを実行します。生成したnpmアーカイブの名前・バージョン・必須ファイル・READMEの固定バージョン・SHA-512を確認してから、その同じアーカイブを公開します。再開時は同じブランチを指定してworkflow_dispatchを実行します。公開済みバージョンはSHA-512が同一でprovenance metadataも確認できた場合だけ再公開を省略し、内容が異なる場合は停止します。
+
+公開workflowのcheckoutはnative gitと一時的な認証ヘッダーを使い、Git設定へ認証情報を保存しません。`scripts/Initialize-NodeBuild.ps1` は公式Node 26.13.0アーカイブをSHASUMS256で確認してから、製品テスト・包装用のnpm 12.2.1 / pnpm 12.15.0を準備します。checkout・toolchain準備にもNode製Actionを使いません。
+
+公開処理は `scripts/Publish-Npm.ps1` を入口とし、PowerShell 7.4以降の `Add-Type` が同梱の `scripts/NpmPublisher.cs` をメモリー内でコンパイルしてOIDC交換とnpm registryへの送信を行います。公開処理にNode/npm・.NET SDK・NuGetは不要です。provenanceはnative cosign 3.0.4でnpm互換のSLSA v1 statementに署名し、GitHub workflow identity・issuer・SHA-512を検証してから同じアーカイブと一緒に送ります。cosign本体も固定SHA-256と公式Sigstore署名の両方を確認してから使います。Node/npmは製品のテスト・包装・配布物確認に使用します。
+
+公開処理の変更時は `pwsh -NoProfile -File scripts/Test-NpmPublisher.ps1 -WorkDirectory <専用の絶対作業パス>` を実行します。実資格情報・外部通信・実cosignを使わず、tarball、OIDC、署名ツールの終了判定、再送しないHTTP境界を確認します。未公開と判断する応答は404だけです。作業パスには今回専用の空ディレクトリを指定し、試験後は生成したfixtureを清掃します。
+
+既存版のスキップとPUT後の成功判定は、同じSHA-512に加え、registry metadataがnpm registryのattestation URLとSLSA v1 provenanceを示すことを要求します。欠落・不正な型・publish attestationだけの応答では停止し、PUTを再送しません。この存在・形式確認は、registryに保存されたbundleの暗号検証とは区別します。PowerShell入口はソースhash別のnamespaceでC#型を読み込み、同じプロセスで異なる版を実行しても以前の型を流用しません。
 
 npm側の初回設定は、パッケージのTrusted PublisherにGitHub Actionsを選び、ユーザー `1llum1n4t1s`、リポジトリ `ProtonPassMcp`、Workflow filename `publish.yml` を登録します。Environmentは空欄にし、Allowed actionsで `npm publish` による直接公開を許可します。この登録時は本人認証が必要ですが、以降のCI公開でnpmトークンや対話認証は不要です。
 

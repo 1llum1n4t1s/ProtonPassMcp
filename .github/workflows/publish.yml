@@ -21,14 +21,22 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: '24'
-      - name: Prepare package tools
-        run: npm install --global npm@12 pnpm@12.15.0
+      - name: Checkout release commit with native git
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git init .
+          git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          git checkout --detach FETCH_HEAD
+
+      - name: Prepare native Node build toolchain
+        shell: pwsh
+        run: ./scripts/Initialize-NodeBuild.ps1 -Version '26.13.0' -NpmVersion '12.2.1' -PnpmVersion '12.15.0'
+
       - name: Check release version
         run: |
           node --input-type=module <<'JS'
@@ -68,26 +76,12 @@ jobs:
           console.log(JSON.stringify({ name: archive.name, version: archive.version, filename, integrity }));
           appendFileSync(process.env.GITHUB_OUTPUT, `filename=${filename}\nintegrity=${integrity}\n`);
           JS
-      - name: Check published version
-        id: registry
-        run: |
-          node --input-type=module <<'JS'
-          import { appendFileSync, readFileSync } from 'node:fs';
-          const { name, version } = JSON.parse(readFileSync('package.json', 'utf8'));
-          const response = await fetch(`https://registry.npmjs.org/${encodeURIComponent(name)}/${version}`);
-          if (!response.ok && response.status !== 404) throw new Error(`Registry returned ${response.status}`);
-          appendFileSync(process.env.GITHUB_OUTPUT, `published=${response.ok}\n`);
-          JS
-      - name: Publish with OIDC
-        if: steps.registry.outputs.published != 'true'
+      - name: Validate native npm publisher contracts
+        shell: pwsh
+        run: ./scripts/Test-NpmPublisher.ps1 -WorkDirectory (Join-Path $env:RUNNER_TEMP 'npm-publisher-contracts')
+      - name: Publish verified artifact with native OIDC
+        shell: pwsh
         env:
           PACKAGE_FILE: ${{ steps.package.outputs.filename }}
           EXPECTED_INTEGRITY: ${{ steps.package.outputs.integrity }}
-        run: |
-          node --input-type=module <<'JS'
-          import assert from 'node:assert/strict';
-          import { createHash } from 'node:crypto';
-          import { readFileSync } from 'node:fs';
-          assert.equal(`sha512-${createHash('sha512').update(readFileSync(process.env.PACKAGE_FILE)).digest('base64')}`, process.env.EXPECTED_INTEGRITY);
-          JS
-          npm publish "$PACKAGE_FILE" --access public --provenance --registry=https://registry.npmjs.org/
+        run: ./scripts/Publish-Npm.ps1 -PackageFile $env:PACKAGE_FILE -ExpectedIntegrity $env:EXPECTED_INTEGRITY
