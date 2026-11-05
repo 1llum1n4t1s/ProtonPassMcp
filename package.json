@@ -17,10 +17,13 @@
   },
   "type": "module",
   "scripts": {
-    "start": "node src/cli.mjs",
-    "test": "node --test test/*.test.mjs",
-    "verify": "node scripts/verify.mjs",
-    "prepublishOnly": "pnpm test"
+    "start": "bun --no-env-file --no-install src/cli.mjs",
+    "start:node": "node src/cli.mjs",
+    "test": "bun --no-env-file --no-install test ./test",
+    "test:node": "node --test test/*.test.mjs",
+    "verify": "bun --no-env-file --no-install scripts/verify.mjs",
+    "verify:node": "node scripts/verify.mjs",
+    "prepublishOnly": "bun --no-env-file --no-install run test"
   },
   "engines": {
     "node": ">=22"

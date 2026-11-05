@@ -195,6 +195,9 @@ test('Windowsの複数ファイル更新に失敗した場合は既存版を復�
   await writeFile(path.join(installDir, 'libcrypto-3-x64.dll'), 'old dll');
   await writeFile(path.join(installDir, 'pass-cli.exe'), 'old exe');
   const archive = Buffer.from('fake zip bytes');
+  let updatedFile;
+  let updatedContents;
+  let updateAttempts = 0;
   await assert.rejects(runSetup(['--force'], {
     platform: 'win32', arch: 'x64', installDir, env: { PATH: '' }, tmpdir: scratch,
     fetch: responses(release(archive), archive),
@@ -203,12 +206,22 @@ test('Windowsの複数ファイル更新に失敗した場合は既存版を復�
       await writeFile(path.join(destination, 'pass-cli.exe'), 'new exe');
     },
     replaceFile: async (source, destination) => {
-      if (source.includes(`${path.sep}extracted${path.sep}`) && destination.endsWith('pass-cli.exe')) {
-        throw new Error('simulated locked executable');
+      if (source.includes(`${path.sep}extracted${path.sep}`)) {
+        updateAttempts++;
+        if (updateAttempts === 2) {
+          assert.equal(await readFile(updatedFile, 'utf8'), updatedContents);
+          throw new Error('simulated second file update failure');
+        }
+        await copyFile(source, destination);
+        updatedFile = destination;
+        updatedContents = await readFile(source, 'utf8');
+        return;
       }
       await copyFile(source, destination);
     },
   }), /既存ファイルを復元/);
+  assert.equal(updateAttempts, 2);
+  assert.ok(updatedFile);
   assert.equal(await readFile(path.join(installDir, 'libcrypto-3-x64.dll'), 'utf8'), 'old dll');
   assert.equal(await readFile(path.join(installDir, 'pass-cli.exe'), 'utf8'), 'old exe');
   assert.deepEqual(await readdir(scratch), []);
@@ -224,6 +237,10 @@ test('Windowsの復元にも失敗した場合は旧版バックアップを保�
   await writeFile(path.join(installDir, 'libcrypto-3-x64.dll'), 'old dll');
   await writeFile(path.join(installDir, 'pass-cli.exe'), 'old exe');
   const archive = Buffer.from('fake zip bytes');
+  let updatedFile;
+  let updatedContents;
+  let updateAttempts = 0;
+  let rollbackFailureInjected = false;
   let failure;
   try {
     await runSetup(['--force'], {
@@ -234,16 +251,29 @@ test('Windowsの復元にも失敗した場合は旧版バックアップを保�
         await writeFile(path.join(destination, 'pass-cli.exe'), 'new exe');
       },
       replaceFile: async (source, destination) => {
-        if (source.includes(`${path.sep}extracted${path.sep}`) && destination.endsWith('pass-cli.exe')) {
-          throw new Error('simulated locked executable');
+        if (source.includes(`${path.sep}extracted${path.sep}`)) {
+          updateAttempts++;
+          if (updateAttempts === 2) {
+            assert.equal(await readFile(updatedFile, 'utf8'), updatedContents);
+            throw new Error('simulated second file update failure');
+          }
+          await copyFile(source, destination);
+          updatedFile = destination;
+          updatedContents = await readFile(source, 'utf8');
+          return;
         }
-        if (source.includes(`${path.sep}backup${path.sep}`) && destination.endsWith('libcrypto-3-x64.dll')) {
+        if (source.includes(`${path.sep}backup${path.sep}`) && destination === updatedFile) {
+          rollbackFailureInjected = true;
           throw new Error('simulated rollback failure');
         }
         await copyFile(source, destination);
       },
     });
   } catch (error) { failure = error; }
+  assert.equal(updateAttempts, 2);
+  assert.ok(updatedFile);
+  assert.equal(rollbackFailureInjected, true);
+  assert.equal(await readFile(updatedFile, 'utf8'), updatedContents);
   assert.ok(failure instanceof SetupError);
   assert.match(failure.message, /旧版バックアップを保持/);
   assert.equal(await readFile(path.join(failure.recoveryDir, 'libcrypto-3-x64.dll'), 'utf8'), 'old dll');
