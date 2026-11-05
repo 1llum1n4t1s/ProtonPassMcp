@@ -57,6 +57,6 @@ MCP起動と `--force` なしの `setup` では、`PASS_CLI_PATH` を実行対�
 
 ## 配布と公開の境界
 
-`.github/workflows/publish.yml` が npm 公開を担う。`release/**` への push または手動実行を入口とし、公開ジョブは `release/` ブランチだけで動く。ブランチ名が `package.json` の `release/<version>` と一致することを検証してから、固定 lockfile による依存解決、配布内容の確認、`pnpm test` へ進む。生成したnpmアーカイブの名前・バージョン・必須ファイル・READMEの固定バージョン・SHA-512を検証し、公開直前にもハッシュを照合して同じアーカイブを公開する。アーカイブ公開では `prepublishOnly` に依存せず、前段の明示的なテストを公開条件とする。npmレジストリで同一バージョンが公開済みなら再公開を省略する。
+`.github/workflows/publish.yml` が npm 公開を担う。`release/**` への push または手動実行を入口とし、公開ジョブは `release/` ブランチだけで動く。ブランチ名が `package.json` の `release/<version>` と一致することを検証してから、固定 lockfile による依存解決、配布内容の確認、BunとNode.js双方のテストへ進む。生成したnpmアーカイブは一度読み込んだ同じバイト列で manifest 全体・許可された全ファイルの内容・種類・重複・CLIの実行権限・READMEの固定バージョンとSHA-512を確認し、公開直前にもハッシュを照合して同じアーカイブを公開する。アーカイブ公開では `prepublishOnly` に依存せず、前段の明示的なテストを公開条件とする。npmレジストリで同一バージョンが公開済みなら再公開を省略する。
 
 公開ジョブは npm Trusted Publishing の OIDC 認証を使い、`id-token: write` 権限で provenance 付きのパッケージを公開する。長期保存する npm トークンを CI に持たせず、npm 側に登録したリポジトリ・workflow との信頼関係に依存する。公開処理は共通の concurrency グループで同時実行を抑え、進行中の公開を後続実行でキャンセルしない。この認証経路は MCP 実行時の Proton Pass セッションとは独立している。初回登録と実行手順は [CONTRIBUTING.md](CONTRIBUTING.md) を参照する。

@@ -303,6 +303,25 @@ test('Content-Lengthと実受信量のサイズ上限を超えた取得を拒否
   }
 });
 
+test('ダウンロード先のオープン失敗を報告し一時物を清掃する', async t => {
+  const root = await temporary();
+  t.after(() => removeFixture(root, { recursive: true, force: true }));
+  const scratch = path.join(root, 'scratch');
+  await mkdir(scratch);
+  const asset = Buffer.from('asset');
+  const fetch = async url => {
+    if (url.toString() === MANIFEST_URL) return new Response(JSON.stringify(release(asset)));
+    const [temporaryRoot] = await readdir(scratch);
+    await mkdir(path.join(scratch, temporaryRoot, 'pass-cli'));
+    return new Response(asset);
+  };
+  await assert.rejects(runSetup(['--force'], {
+    platform: 'linux', arch: 'x64', installDir: path.join(root, 'install'),
+    env: { PATH: '' }, tmpdir: scratch, fetch,
+  }), /セットアップに失敗/);
+  assert.deepEqual(await readdir(scratch), []);
+});
+
 test('manifest取得と資産取得の両方へタイムアウトを設定する', async t => {
   const root = await temporary();
   t.after(() => removeFixture(root, { recursive: true, force: true }));

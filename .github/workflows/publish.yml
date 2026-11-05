@@ -33,49 +33,48 @@ jobs:
           git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" fetch --no-tags --depth=1 origin "$GITHUB_SHA"
           git checkout --detach FETCH_HEAD
 
-      - name: Prepare native Node build toolchain
-        shell: pwsh
-        run: ./scripts/Initialize-NodeBuild.ps1 -Version '26.13.0' -NpmVersion '12.2.1' -PnpmVersion '12.15.0'
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: '1.4.4'
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26.13.0'
 
       - name: Check release version
         run: |
-          node --input-type=module <<'JS'
+          bun - <<'JS'
           import assert from 'node:assert/strict';
           import { readFileSync } from 'node:fs';
           const { version } = JSON.parse(readFileSync('package.json', 'utf8'));
           assert.equal(process.env.GITHUB_REF_NAME, `release/${version}`);
           JS
-      - run: pnpm install --frozen-lockfile
+      - run: bun install --frozen-lockfile --no-save
       - name: Check package contents
-        run: npm pack --dry-run
-      - run: pnpm test
+        run: bun pm pack --dry-run
+      - run: bun test
+      - name: Validate Node compatibility
+        run: |
+          node -e "if (process.versions.bun || process.version !== 'v26.13.0') process.exit(1)"
+          node --test test/*.test.mjs
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22.0.0'
+      - name: Validate minimum Node version
+        run: |
+          node -e "if (process.versions.bun || process.version !== 'v22.0.0') process.exit(1)"
+          node --test test/*.test.mjs
       - name: Package and verify publish artifact
         id: package
+        shell: pwsh
         run: |
-          node --input-type=module <<'JS'
-          import assert from 'node:assert/strict';
-          import { execFileSync } from 'node:child_process';
-          import { createHash } from 'node:crypto';
-          import { appendFileSync, readFileSync } from 'node:fs';
-          import path from 'node:path';
-          const manifest = JSON.parse(readFileSync('package.json', 'utf8'));
-          const packed = JSON.parse(execFileSync('npm', ['pack', '--json', '--pack-destination', process.env.RUNNER_TEMP], { encoding: 'utf8' }));
-          const [artifact] = Array.isArray(packed) ? packed : Object.values(packed);
-          const filename = path.join(process.env.RUNNER_TEMP, artifact.filename);
-          const { integrity } = artifact;
-          const archive = JSON.parse(execFileSync('tar', ['-xOf', filename, 'package/package.json'], { encoding: 'utf8' }));
-          assert.equal(archive.name, manifest.name);
-          assert.equal(archive.version, manifest.version);
-          const files = execFileSync('tar', ['-tzf', filename], { encoding: 'utf8' }).trim().split('\n');
-          for (const required of ['package.json', 'README.md', 'CHANGELOG.md', 'src/cli.mjs', 'src/server.mjs', 'src/handoff-consumer.mjs']) {
-            assert.ok(files.includes(`package/${required}`), `Missing package file: ${required}`);
-          }
-          const readme = execFileSync('tar', ['-xOf', filename, 'package/README.md'], { encoding: 'utf8' });
-          assert.ok(readme.includes(`${manifest.name}@${manifest.version}`));
-          assert.equal(`sha512-${createHash('sha512').update(readFileSync(filename)).digest('base64')}`, integrity);
-          console.log(JSON.stringify({ name: archive.name, version: archive.version, filename, integrity }));
-          appendFileSync(process.env.GITHUB_OUTPUT, `filename=${filename}\nintegrity=${integrity}\n`);
-          JS
+          $filename = bun pm pack --quiet --destination $env:RUNNER_TEMP
+          if ($LASTEXITCODE -ne 0) { throw 'Package creation failed' }
+          $verified = ./scripts/Verify-BunPackage.ps1 -PackageFile $filename
+          $fixtures = Join-Path $env:RUNNER_TEMP 'package-verifier-fixtures'
+          New-Item -ItemType Directory -Path $fixtures | Out-Null
+          ./scripts/Test-BunPackageVerifier.ps1 -PackageFile $filename -WorkDirectory $fixtures
+          "filename=$($verified.PackageFile)" >> $env:GITHUB_OUTPUT
+          "integrity=$($verified.Integrity)" >> $env:GITHUB_OUTPUT
       - name: Validate native npm publisher contracts
         shell: pwsh
         run: ./scripts/Test-NpmPublisher.ps1 -WorkDirectory (Join-Path $env:RUNNER_TEMP 'npm-publisher-contracts')

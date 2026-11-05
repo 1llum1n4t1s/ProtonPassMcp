@@ -227,7 +227,15 @@ async function downloadFile(response, filename, maxBytes) {
       callback(null, chunk);
     },
   });
-  await pipeline(Readable.fromWeb(response.body), limiter, createWriteStream(filename, { flags: 'wx' }));
+  const input = Readable.fromWeb(response.body);
+  const output = createWriteStream(filename, { flags: 'wx' });
+  const closed = new Promise(resolve => output.once('close', resolve));
+  try {
+    await pipeline(input, limiter, output);
+  } finally {
+    if (!output.destroyed) output.destroy();
+    await closed;
+  }
   return hash.digest('hex');
 }
 
