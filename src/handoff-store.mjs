@@ -67,7 +67,7 @@ export class FileHandoffStore {
     await protectDirectory(this.session, signal);
     await marker(this.session, { app: APP_ID, pid: process.pid });
     cancelled(signal);
-    const child = spawn(process.execPath, [fileURLToPath(new URL('./handoff-janitor.mjs', import.meta.url)), this.session], { shell: false, windowsHide: true, detached: true, env: minimalEnvironment(), stdio: ['pipe', 'pipe', 'ignore'] });
+    const child = spawn(process.execPath, [...(process.versions.bun ? ['--no-env-file', '--no-install'] : []), fileURLToPath(new URL('./handoff-janitor.mjs', import.meta.url)), this.session], { shell: false, windowsHide: true, detached: true, env: minimalEnvironment(), stdio: ['pipe', 'pipe', 'ignore'] });
     this.child = child;
     child.stdin.on('error', () => {});
     child.stdout.on('error', () => this.invalidate());

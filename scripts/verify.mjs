@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const client = new Client({ name: 'proton-pass-verification', version: '1.0.0' });
 const transport = new StdioClientTransport({ command: process.execPath,
-  args: [fileURLToPath(new URL('../src/cli.mjs', import.meta.url))],
+  args: [...(process.versions.bun ? ['--no-env-file', '--no-install'] : []), fileURLToPath(new URL('../src/cli.mjs', import.meta.url))],
   env: { ...process.env }, stderr: 'pipe' });
 try {
   await client.connect(transport);
