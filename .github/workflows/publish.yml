@@ -15,10 +15,11 @@ concurrency:
 jobs:
   publish:
     if: startsWith(github.ref, 'refs/heads/release/')
-    runs-on: [self-hosted, Linux, ARM64, m3mb14]
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
+      id-token: write
     steps:
       - name: Checkout release commit with native git
         shell: bash
@@ -77,10 +78,9 @@ jobs:
       - name: Validate native npm publisher contracts
         shell: pwsh
         run: ./scripts/Test-NpmPublisher.ps1 -WorkDirectory (Join-Path $env:RUNNER_TEMP 'npm-publisher-contracts')
-      - name: Publish verified artifact with native token authentication
+      - name: Publish verified artifact with native OIDC
         shell: pwsh
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           PACKAGE_FILE: ${{ steps.package.outputs.filename }}
           EXPECTED_INTEGRITY: ${{ steps.package.outputs.integrity }}
         run: ./scripts/Publish-Npm.ps1 -PackageFile $env:PACKAGE_FILE -ExpectedIntegrity $env:EXPECTED_INTEGRITY

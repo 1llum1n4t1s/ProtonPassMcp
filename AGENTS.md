@@ -17,7 +17,7 @@
 - 実装を変更したときは `bun test` を実行し、認証失敗、秘密の出力抑制、検索カーソル、直列実行の契約を維持する。テストデータと CLI runner の差し替えを使って確認する。
 - MCP 接続を実セッションで検証するときは、利用可能な `PASS_CLI_PATH` と `PROTON_PASS_SESSION_DIR` を設定して `bun --no-env-file --no-install scripts/verify.mjs` を実行する。取得ポリシー未設定時はアクセス可能な保管庫が1件以上必要で、設定時は空の保管庫一覧も許容する。検証範囲と設定別の条件は [CONTRIBUTING.md](CONTRIBUTING.md) を参照する。
 - 配布内容を変更したときは `bun pm pack --dry-run` で同梱対象を確認する。`prepublishOnly` と既定のtestはBunで実行する。Node.js互換確認は `npm run test:node` と公開workflowの明示的なNodeテストを使う。開発コマンドの詳細は CONTRIBUTING を参照する。
-- リリース作業では [CONTRIBUTING.md](CONTRIBUTING.md) の公開手順に従い、`.github/workflows/publish.yml` を使う。README の MCP 設定例にあるパッケージの固定バージョンを `package.json` と揃え、npm に同梱される README も確認する。公開設定を変更するときは、ブランチ名と manifest バージョンの一致検証、公開前テスト、NPM_TOKEN secretによるtoken認証と、内容・SHA-512を検証した同一アーカイブの公開を維持する。
+- リリース作業では [CONTRIBUTING.md](CONTRIBUTING.md) の公開手順に従い、`.github/workflows/publish.yml` を使う。README の MCP 設定例にあるパッケージの固定バージョンを `package.json` と揃え、npm に同梱される README も確認する。公開設定を変更するときは、ブランチ名と manifest バージョンの一致検証、公開前テスト、GitHub-hosted publish jobのOIDC認証と、内容・SHA-512を検証した同一アーカイブの公開を維持する。
 - このリポジトリの `/vava` には、公開後のこのPCのToolport専用runtime更新と、既存のProton Pass認証設定を使った実セッション検証を含める。[Toolport側の更新と接続確認](CONTRIBUTING.md#toolport側の更新と接続確認)に従い、公開したバージョンの導入、`bun --no-env-file --no-install scripts/verify.mjs`、ラッパーのバージョン確認、Toolport経由の実ツール呼び出しまでを完了条件とする。このローカルruntimeはGit参照元とは別の明示的な更新対象であり、`consumerUpdates.targets` が未設定でも省略しない。再接続待ちは同じバージョンの未完了工程として引き継ぐ。
 
 ## 実装上の制約
