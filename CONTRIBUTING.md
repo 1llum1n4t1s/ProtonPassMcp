@@ -19,23 +19,21 @@ bun test
 
 ファイル受け渡しを変更した場合は、Windows実機で現在ユーザーだけのprotected ACLと、安全でない既存領域での取得前拒否を確認します。ダミーCLIを実stdio MCPから呼び、会話へ値が出ないこと、consumerを実IABで読み込んだ入力成功、使用後の不存在、二重使用・コールバック例外・期限切れ・キャンセルでの回収を確認します。サーバー強制終了、監視プロセス単独終了、両方終了後の次回起動時の回収も対象です。実パスワードを検証ログやfixtureへ保存しません。
 
-公開は `.github/workflows/publish.yml` からnpm Trusted Publishing（OIDC）を使います。`package.json` と一致する `release/<version>` ブランチをpushすると、依存解決・配布確認・BunとNode.jsのテストを実行します。生成したnpmアーカイブを一度読み込み、manifest全体・許可した全ファイルの内容と種類・重複・CLIの実行権限・READMEの固定バージョンを確認し、同じバイト列のSHA-512を算出します。欠落や改ざんなどの不正なアーカイブを拒否するテストも実行し、公開直前にハッシュを再確認して同じアーカイブを公開します。再開時は同じブランチを指定してworkflow_dispatchを実行します。公開済みバージョンはSHA-512が同一でprovenance metadataも確認できた場合だけ再公開を省略し、内容が異なる場合は停止します。
+公開は `.github/workflows/publish.yml` からNPM_TOKEN repository secretによるtoken認証を使います。`package.json` と一致する `release/<version>` ブランチをpushすると、依存解決・配布確認・BunとNode.jsのテストを実行します。生成したnpmアーカイブを一度読み込み、manifest全体・許可した全ファイルの内容と種類・重複・CLIの実行権限・READMEの固定バージョンを確認し、同じバイト列のSHA-512を算出します。欠落や改ざんなどの不正なアーカイブを拒否するテストも実行し、公開直前にハッシュを再確認して同じアーカイブを公開します。再開時は同じブランチを指定してworkflow_dispatchを実行します。公開済みバージョンはSHA-512が同一の場合だけ再公開を省略し、内容が異なる場合は停止します。
 
 公開workflowのcheckoutはnative gitと一時的な認証ヘッダーを使い、Git設定へ認証情報を保存しません。SHA固定の公式 setup-bun Action で Bun を準備し、Node.js 26.13.0 と対応下限の 22.0.0 でも既存の利用経路をテストします。これらのAction自体もGitHub ActionsランナーのNode.jsを使います。
 
-公開処理は `scripts/Publish-Npm.ps1` を入口とし、PowerShell 7.4以降の `Add-Type` が同梱の `scripts/NpmPublisher.cs` をメモリー内でコンパイルしてOIDC交換とnpm registryへの送信を行います。公開処理にNode/npm・.NET SDK・NuGetは不要です。provenanceはnative cosign 3.0.4でnpm互換のSLSA v1 statementに署名し、GitHub workflow identity・issuer・SHA-512を検証してから同じアーカイブと一緒に送ります。cosign本体も固定SHA-256と公式Sigstore署名の両方を確認してから使います。テスト・包装・配布物確認にはBunを使います。
+公開処理は scripts/Publish-Npm.ps1 を入口とし、PowerShell 7.4以降のAdd-Typeが同梱C#をメモリー内でコンパイルします。公開stepだけに secrets.NPM_TOKEN を NODE_AUTH_TOKEN として渡します。直接呼出しではNPM_TOKENもfallbackとして使えます。対象packageへpublishできるtokenが必要です。公開処理にNode/npm・.NET SDK・NuGetは不要です。self-hosted runnerはnpmのTrusted Publishing・provenance対象外のため、OIDC交換・cosign署名・provenance添付は行いません。テストと包装にはBunを使います。
 
-公開処理の変更時は `pwsh -NoProfile -File scripts/Test-NpmPublisher.ps1 -WorkDirectory <専用の絶対作業パス>` を実行します。実資格情報・外部通信・実cosignを使わず、tarball、OIDC、署名ツールの終了判定、再送しないHTTP境界を確認します。未公開と判断する応答は404だけです。作業パスには今回専用の空ディレクトリを指定し、試験後は生成したfixtureを清掃します。
+公開処理の変更時は `pwsh -NoProfile -File scripts/Test-NpmPublisher.ps1 -WorkDirectory <専用の絶対作業パス>` を実行します。実資格情報・外部通信を使わず、tarball、token必須・fallback、再送しないHTTP境界を確認します。未公開と判断する応答は404だけです。試験後は今回専用fixtureを清掃します。
 
-既存版のスキップとPUT後の成功判定は、同じSHA-512に加え、registry metadataがnpm registryのattestation URLとSLSA v1 provenanceを示すことを要求します。欠落・不正な型・publish attestationだけの応答では停止し、PUTを再送しません。この存在・形式確認は、registryに保存されたbundleの暗号検証とは区別します。PowerShell入口はソースhash別のnamespaceでC#型を読み込み、同じプロセスで異なる版を実行しても以前の型を流用しません。
-
-npm側の初回設定は、パッケージのTrusted PublisherにGitHub Actionsを選び、ユーザー `1llum1n4t1s`、リポジトリ `ProtonPassMcp`、Workflow filename `publish.yml` を登録します。Environmentは空欄にし、Allowed actionsで `npm publish` による直接公開を許可します。この登録時は本人認証が必要ですが、以降のCI公開でnpmトークンや対話認証は不要です。
+既存版はregistryのSHA-512一致を要求します。attestation未掲載を許容し、旧版のprovenance掲載情報がある場合はnpm registryのpackage固有URLとSLSA v1形式を確認します。これは保存済みbundleの暗号検証ではありません。PUT成功応答後はregistryのSHA-512と、掲載がある場合のprovenance形式を確認します。不明なPUT結果を再送しません。PowerShell入口はソースhash別namespaceを維持します。
 
 パッケージのバージョンは `package.json` が正本です。ローカルでは `bun pm pack --dry-run` で同梱対象を確認できます。
 
 ## Toolport側の更新と接続確認
 
-このリポジトリで `/vava` を実行するときは、npm公開後に、このPCのToolport専用runtimeの更新と実セッションの接続確認まで続けます。npmの公開確認だけでは、この後続工程を完了にしません。以下はGit参照元の更新とは別に許可されたローカル運用です。
+このリポジトリで `/vava` を実行するときは、npm公開後に、このPCのToolport専用runtimeの更新と実セッションの接続確認まで続けます。npmの公開受付だけでは、この後続工程を完了にしません。以下はGit参照元の更新とは別に許可されたローカル運用です。
 
 1. 公開したバージョンのnpm配信物を取得・照合してから、`%USERPROFILE%\.local\bin\proton-pass-mcp-wrapper.mjs` を読み、実際のruntime、`PASS_CLI_PATH`、`PROTON_PASS_SESSION_DIR` の設定元を確認します。既存のCLIと認証セッションを引き継ぎ、ログイン情報や秘密フィールドは取得しません。環境変数が未設定なら、ラッパーの既存設定を確認して検証プロセスに渡します。
 2. 専用runtime（現在は `%USERPROFILE%\.local\share\toolport-mcp-runtime`）の `@kagayoi/proton-pass-mcp` だけを、今回公開したバージョンに完全固定してpnpmで更新します。`package.json` と `pnpm-lock.yaml` を同期し、`pnpm-workspace.yaml` に当該パッケージの `minimumReleaseAgeExclude` がある場合は同じバージョンへ揃えます。他の直接依存の固定値は維持し、既存のstore配置を確認して使います。更新後は `pnpm install --frozen-lockfile --ignore-scripts` を実行し、設定値とインストール済みパッケージのバージョンを照合します。一時物は作業契約で定めた外部作業領域へ出力します。

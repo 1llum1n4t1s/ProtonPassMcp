@@ -59,4 +59,4 @@ MCP起動と `--force` なしの `setup` では、`PASS_CLI_PATH` を実行対�
 
 `.github/workflows/publish.yml` が npm 公開を担う。`release/**` への push または手動実行を入口とし、公開ジョブは `release/` ブランチだけで動く。ブランチ名が `package.json` の `release/<version>` と一致することを検証してから、固定 lockfile による依存解決、配布内容の確認、BunとNode.js双方のテストへ進む。生成したnpmアーカイブは一度読み込んだ同じバイト列で manifest 全体・許可された全ファイルの内容・種類・重複・CLIの実行権限・READMEの固定バージョンとSHA-512を確認し、公開直前にもハッシュを照合して同じアーカイブを公開する。アーカイブ公開では `prepublishOnly` に依存せず、前段の明示的なテストを公開条件とする。npmレジストリで同一バージョンが公開済みなら再公開を省略する。
 
-公開ジョブは npm Trusted Publishing の OIDC 認証を使い、`id-token: write` 権限で provenance 付きのパッケージを公開する。長期保存する npm トークンを CI に持たせず、npm 側に登録したリポジトリ・workflow との信頼関係に依存する。公開処理は共通の concurrency グループで同時実行を抑え、進行中の公開を後続実行でキャンセルしない。この認証経路は MCP 実行時の Proton Pass セッションとは独立している。初回登録と実行手順は [CONTRIBUTING.md](CONTRIBUTING.md) を参照する。
+公開ジョブは M3MB14 の self-hosted runner で動き、GitHub Secret `NPM_TOKEN` を公開ステップだけの `NODE_AUTH_TOKEN` へ渡して認証する。npm Trusted Publishing と新規 provenance の生成は self-hosted 非対応のため使用しない。公開済みバージョンは同じ SHA-512 integrity を必須とし、旧 provenance が掲載されている場合はその形式も確認する。公開処理は共通の concurrency グループで同時実行を抑え、進行中の公開を後続実行でキャンセルしない。この認証経路は MCP 実行時の Proton Pass セッションとは独立している。初回登録と実行手順は [CONTRIBUTING.md](CONTRIBUTING.md) を参照する。
