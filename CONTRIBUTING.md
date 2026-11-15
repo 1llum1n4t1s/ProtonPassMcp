@@ -35,10 +35,17 @@ native publisherはGitHub OIDC交換による短期tokenとcosign 3.0.4による
 
 このリポジトリで `/vava` を実行するときは、npm公開後に、このPCのToolport専用runtimeの更新と実セッションの接続確認まで続けます。npmの公開受付だけでは、この後続工程を完了にしません。以下はGit参照元の更新とは別に許可されたローカル運用です。
 
-1. 公開したバージョンのnpm配信物を取得・照合してから、`%USERPROFILE%\.local\bin\proton-pass-mcp-wrapper.mjs` を読み、実際のruntime、`PASS_CLI_PATH`、`PROTON_PASS_SESSION_DIR` の設定元を確認します。既存のCLIと認証セッションを引き継ぎ、ログイン情報や秘密フィールドは取得しません。環境変数が未設定なら、ラッパーの既存設定を確認して検証プロセスに渡します。
-2. 専用runtime（現在は `%USERPROFILE%\.local\share\toolport-mcp-runtime`）の `@kagayoi/proton-pass-mcp` だけを、今回公開したバージョンに完全固定してpnpmで更新します。`package.json` と `pnpm-lock.yaml` を同期し、`pnpm-workspace.yaml` に当該パッケージの `minimumReleaseAgeExclude` がある場合は同じバージョンへ揃えます。他の直接依存の固定値は維持し、既存のstore配置を確認して使います。更新後は `pnpm install --frozen-lockfile --ignore-scripts` を実行し、設定値とインストール済みパッケージのバージョンを照合します。一時物は作業契約で定めた外部作業領域へ出力します。
+1. 公開したバージョンのnpm配信物を取得・照合してから、Toolportが起動するラッパー（現在は `D:\Toolport\wrappers\proton-pass-mcp-wrapper.mjs`）を読み、実際のruntime、`PASS_CLI_PATH`、`PROTON_PASS_SESSION_DIR` の設定元を確認します。配置が変わっている可能性があるため、Toolport経由で起動中のProton Passプロセスがあれば、そのコマンドラインも照合して実際に使われているラッパーとruntimeを特定します。既存のCLIと認証セッションを引き継ぎ、ログイン情報や秘密フィールドは取得しません。環境変数が未設定なら、ラッパーの既存設定を確認して検証プロセスに渡します。
+2. 専用runtime（現在は `D:\Toolport\runtimes\node`。app-publish・cws・retroweb等の他のMCPと共有）の `@kagayoi/proton-pass-mcp` だけを、今回公開したバージョンへ更新します。`package.json` の指定子は既存の値（現在は `latest`）を維持し、`pnpm-lock.yaml` で今回公開したバージョンに完全固定します。`pnpm-workspace.yaml` に当該パッケージの `minimumReleaseAgeExclude` がある場合は同じバージョンへ揃えます。他のパッケージの解決済みバージョンとpatchは維持します。`pnpm add` / `pnpm update` は指定子 `latest` の他パッケージを再解決し、旧版向けpatchが `ERR_PNPM_UNUSED_PATCH` で失敗することがあります。その場合は新旧バージョンの依存・engines・binが同一であることをnpm registryで確認し、lockの当該パッケージの項目（importerのversion、packagesのキーとintegrity、snapshotsのキー）だけを書き換えます。更新後は `pnpm install --frozen-lockfile --ignore-scripts --config.optimistic-repeat-install=false` を実行し、設定値とインストール済みパッケージのバージョン、他パッケージのバージョン・patch適用結果が変わっていないことを照合します。`node_modules/.modules.yaml` の `storeDir` が存在しないstoreを指す場合、pnpmはnode_modulesの作り直しを要求します。共有runtimeの他MCPも巻き込むため、作り直しは本人の承認を得てから行います（承認後は旧node_modulesをPrunletで削除し、同じfrozen installで再構築します）。一時物は作業契約で定めた外部作業領域へ出力します。
 3. 既存のCLI・セッション設定で、このリポジトリの `bun --no-env-file --no-install scripts/verify.mjs` を実行します。さらにToolportが使うラッパーへMCPクライアントで接続し、initialize応答の `serverInfo.version` が公開バージョンと一致することを確認します。ソース側の成功だけで専用runtimeの検証を代替しません。
 4. ToolportのProton Pass接続をONのまま更新します。処理中の操作がないことと対象のPID・実行パス・引数・親子関係を照合し、接続中の旧MCPサーバーだけを終了します。Toolport v1.24.2は連続3回のtransport障害と20秒の待機後に対象を再接続するため、同じチャットから読み取り専用の `proton_pass__session_status({})` を最大3回呼び、切断エラーが続く場合だけ最後の失敗から20秒超待って再確認します。再接続した呼び出しは元エラーを返すことがあるため、合計5回まで確認し、成功時点で止めます。他のサーバーやenabled設定は変更しません。認証・権限・入力の問題にはこの再試行を使わず、自動復旧の上限を確認しても解決しない場合だけ必要な利用者操作を依頼します。Toolport更新で復旧条件が変わった場合は再確認します。
 5. 同じチャットからToolport経由で `proton_pass__session_status` の `authenticated: true` と、`proton_pass__list_vaults` による保管庫1件以上の取得を確認します。新しいプロセスが更新済みruntimeを使うことも照合します。ツール追加・変更を含む更新では、ラッパーの `tools/list` とToolportの検索結果・入力スキーマも照合します。保管庫名・ID・秘密値は検証記録へ転載せず、バージョン、成否、件数だけを報告します。不要な一時物を清掃して完了とします。
 
 更新失敗、認証失敗、再接続待ちは、公開済みの同じバージョンの未完了工程として保持し、次回はその工程から再開します。再公開や別バージョンへの更新で置き換えません。完了報告ではnpm公開、専用runtime更新、実セッション検証、Toolport経由の接続確認を区別します。
+
+## 多言語化
+
+- 人が読む文言は `src/locales/<タグ>.json` の9言語の辞書で持ち、キーは `setup.noFetch` のような安定した識別子にします。プレースホルダーは `{name}` 形式で、全言語で同じ集合にします。辞書に無いキーは英語で表示します。
+- 文言を足したり変えたりしたら、9言語すべての辞書を更新し、`bun test`（または `npm run test:node`）で `test/i18n.test.mjs` の整合検査（キー集合・プレースホルダー・コードが参照するキー・言語タグの照合・READMEの構成）を通します。
+- MCP の説明やAIへ返す応答・エラーは英語のままコードに書き、辞書へ入れません。
+- READMEを変えたら全言語版を同時に直します。READMEの他言語版は `package.json` の `files` に列挙せずに済ませるため、Bunの自動同梱に任せ、`scripts/Verify-BunPackage.ps1` の同梱ファイル一覧と件数（`scripts/Test-BunPackageVerifier.ps1`）を更新します。

@@ -12,13 +12,25 @@ if ($manifest['name'].GetValue[string]() -cne '@kagayoi/proton-pass-mcp' -or
 $expected = [Collections.Generic.Dictionary[string, string]]::new([StringComparer]::Ordinal)
 foreach ($file in @(
     'package.json', 'README.md', 'CHANGELOG.md', 'LICENSE',
+    # READMEの他言語版（Bunは README.*.md を自動で同梱する）。
+    'README.de.md', 'README.es.md', 'README.fr.md', 'README.ja.md', 'README.ko.md', 'README.pt-BR.md', 'README.zh-CN.md', 'README.zh-TW.md',
     'src/access-policy.mjs', 'src/cli.mjs', 'src/handoff-consumer.mjs', 'src/handoff-janitor.mjs',
     'src/handoff-protocol.mjs', 'src/handoff-security.mjs', 'src/handoff-store.mjs',
-    'src/inputs.mjs', 'src/pass.mjs', 'src/server.mjs', 'src/setup.mjs'
+    'src/i18n.mjs', 'src/inputs.mjs', 'src/pass.mjs', 'src/server.mjs', 'src/setup.mjs',
+    # 人が読む文言の辞書（9言語）。
+    'src/locales/de.json', 'src/locales/en.json', 'src/locales/es.json', 'src/locales/fr.json', 'src/locales/ja.json',
+    'src/locales/ko.json', 'src/locales/pt-BR.json', 'src/locales/zh-CN.json', 'src/locales/zh-TW.json'
 )) { $expected.Add('package/' + $file, (Join-Path $root $file)) }
 if (-not [IO.File]::ReadAllText((Join-Path $root 'README.md')).Contains(
     $manifest['name'].GetValue[string]() + '@' + $manifest['version'].GetValue[string](), [StringComparison]::Ordinal)) {
     throw 'README package version differs'
+}
+# 他言語のREADMEも同じ固定版を含むことを確認し、公開前に版の取り残しを検出する。
+foreach ($translated in Get-ChildItem -LiteralPath $root -File -Filter 'README.*.md') {
+    if (-not [IO.File]::ReadAllText($translated.FullName).Contains(
+        $manifest['name'].GetValue[string]() + '@' + $manifest['version'].GetValue[string](), [StringComparison]::Ordinal)) {
+        throw "README package version differs: $($translated.Name)"
+    }
 }
 $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 # 検査とハッシュは同じ一度読み込んだアーカイブを使う。

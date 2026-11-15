@@ -1,56 +1,58 @@
 # Proton Pass MCP
 
-既存の `pass-cli` 認証セッションを使って、MCPクライアントからProton Passを検索するローカルMCPサーバーです。Proton公式の製品ではありません。
+**English** | [日本語](README.ja.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Português (Brasil)](README.pt-BR.md)
 
-Node.js を使わない場合は Bun 1.4.4 以降をインストールし、以下の `"command": "npx"` と `"args": ["--yes", "@kagayoi/proton-pass-mcp@latest"]` をそれぞれ `"command": "bunx"` と `"args": ["--bun", "@kagayoi/proton-pass-mcp@latest"]` に変更してください（コマンドでは `bunx --bun @kagayoi/proton-pass-mcp@latest`）。`--bun` は Node.js の代わりに Bun で実行するために必要です。既存の `npx` 設定も Node.js 22 以降で利用できます。
+A local MCP server that lets an MCP client search Proton Pass through an existing `pass-cli` authenticated session. It is not an official Proton product.
 
-## 利用できる機能
+To avoid Node.js, install Bun 1.4.4 or later and change `"command": "npx"` and `"args": ["--yes", "@kagayoi/proton-pass-mcp@latest"]` below to `"command": "bunx"` and `"args": ["--bun", "@kagayoi/proton-pass-mcp@latest"]` respectively (as a command: `bunx --bun @kagayoi/proton-pass-mcp@latest`). `--bun` is required to run on Bun instead of Node.js. Existing `npx` configurations also keep working on Node.js 22 or later.
 
-| ツール | 用途 |
+## Features
+
+| Tool | Purpose |
 |---|---|
-| `session_status` | セッションの接続確認 |
-| `list_vaults` | 保管庫名と共有IDの一覧 |
-| `list_shares` | 許可された共有の一覧 |
-| `list_items` | タイトルによる検索とアイテム一覧 |
-| `search_notes` | テキストノートのタイトル・本文の部分文字列検索（取得制限の設定中は使用不可） |
-| `create_field_handoff` | 値を会話へ返さず、保護された一時ファイルへの参照を作成 |
-| `release_field_handoff` | 未使用・失敗した受け渡しを回収 |
-| `read_field` | 理由を指定して1フィールドを取得。アイテム・フィールド・期限・頻度の制限が可能 |
+| `session_status` | Check the session connection |
+| `list_vaults` | List vault names and share IDs |
+| `list_shares` | List the allowed shares |
+| `list_items` | Search by title and list items |
+| `search_notes` | Substring search over the title and body of text notes (unavailable while an access policy is set) |
+| `create_field_handoff` | Create a reference to a protected temporary file without returning the value to the conversation |
+| `release_field_handoff` | Reclaim unused or failed handoffs |
+| `read_field` | Read one field with a stated reason. Items, fields, expiry, and frequency can be restricted |
 
-`search_notes` は本文を内部で照合し、一致するタイトル・ID・状態だけ返します。大文字小文字を区別します。添付ファイルは検索対象に含みません。`state` の既定値は `active`、ごみ箱込みなら `all` を指定します。
+`search_notes` matches bodies internally and returns only the matching titles, IDs, and states. It is case-sensitive. Attachments are not searched. `state` defaults to `active`; specify `all` to include the trash.
 
-`list_vaults` で得た `share_id` ごとに検索します。`complete: false` の場合は、同じ条件に `next_cursor` を `cursor` として渡して続行し、各ページの `matches` を集めてください。対象一覧が途中で変わった場合は最初から検索します。本文は照合時点の値を使います。
+Search per `share_id` obtained from `list_vaults`. If `complete: false`, continue by passing `next_cursor` as `cursor` with the same criteria, and collect the `matches` of every page. If the target list changes midway, search again from the start. Bodies are matched using their values at the time of matching.
 
-`list_items` のタイトル検索は大文字小文字を区別しません。`next_offset` がある場合は、その値を `offset` に指定して続行します。
+The title search of `list_items` is case-insensitive. If `next_offset` is present, continue by passing it as `offset`.
 
-`search_notes`・`read_field`・`create_field_handoff` は、具体的な依頼・目的を示す `reason`（前後の空白を除いて5〜300文字、Unicodeコードポイント数で計測）が必要です。`read_field` は要求した値を平文のツール結果としてAIへ渡します。接続先の会話履歴・作業ログに残る可能性があり、理由の指定は対話的な承認やログの抑制を行う仕組みではありません。Codexで会話に値を出さず入力する場合は、次のファイル受け渡しを使ってください。
+`search_notes`, `read_field`, and `create_field_handoff` require a `reason` (5 to 300 characters after trimming surrounding whitespace, counted in Unicode code points) stating the concrete request or purpose. `read_field` hands the requested value to the AI as a plain-text tool result. It may remain in the connected conversation history and work logs, and specifying a reason is not a mechanism for interactive approval or for suppressing logs. To enter a value in Codex without showing it in the conversation, use the file handoff below.
 
-`read_field` の `field` は空白・日本語・セクション名（例 `本番.パスワード`）を含む名前を指定できます。1〜100文字（Unicodeコードポイント数）で、制御文字は使用できません。
+The `field` of `read_field` can be a name containing spaces, non-ASCII characters, or a section name (for example `Production.Password`). It must be 1 to 100 characters (in Unicode code points) and must not contain control characters.
 
-### Codexで会話にパスワードを出さずログインする
+### Log in from Codex without showing the password in the conversation
 
-MCPとCodexのブラウザ実行環境が同じローカルファイルへアクセスできる場合に使えます。MCPから返るのは `handoff_id`・`file_path`・`expires_at`・`consumer_module_url`・フィールド名だけです。パスワード本体は返しません。
+This works when the MCP and the Codex browser execution environment can access the same local files. The MCP returns only `handoff_id`, `file_path`, `expires_at`, `consumer_module_url`, and the field name. It never returns the password itself.
 
-1. ログイン先のURLと対象アカウントを確認します。
-2. `create_field_handoff` に共有ID・アイテムID・フィールド名・理由を渡します。
-3. Codexのブラウザ実行コードで、返された参照を `withFieldHandoff` へ渡して入力します。本文を読むツール、`console.log`、`nodeRepl.write` などへ値を出さないでください。
-4. 未使用で中止した場合は `release_field_handoff` に `handoff_id` を渡します。入力時の例外は補助関数が使用後の削除を行います。回収済み・未知のIDへの再実行も安全ですが、当該サーバーで確認できないIDは `{ released: false }` を返します。
+1. Confirm the login URL and the target account.
+2. Pass the share ID, item ID, field name, and reason to `create_field_handoff`.
+3. In the Codex browser execution code, pass the returned reference to `withFieldHandoff` to enter the value. Do not output the value to tools that read the body, `console.log`, `nodeRepl.write`, and so on.
+4. If you abort without using it, pass the `handoff_id` to `release_field_handoff`. If the entry throws, the helper deletes the file after use. Running it again for an already reclaimed or unknown ID is safe, but an ID this server cannot confirm returns `{ released: false }`.
 
-Codexの内蔵ブラウザを操作するJavaScriptでの例です。`receipt` は作成ツールが返した参照、`tab` は確認済みのブラウザタブです。URLとラベルは実際のログイン先へ合わせてください。
+Here is an example in JavaScript that drives the Codex built-in browser. `receipt` is the reference returned by the create tool, and `tab` is a confirmed browser tab. Adjust the URL and the label to the actual login target.
 
 ```javascript
 var { withFieldHandoff } = await import(receipt.consumer_module_url);
 await withFieldHandoff(receipt, async value => {
   if (new URL(await tab.url()).origin !== 'https://example.com') {
-    throw new Error('ログイン先が変わりました。');
+    throw new Error('The login target changed.');
   }
-  await tab.playwright.getByLabel('パスワード', { exact: true }).fill(value);
+  await tab.playwright.getByLabel('Password', { exact: true }).fill(value);
 });
 ```
 
-補助関数は一度だけファイルを取得できるようにし、コールバックの成功・失敗にかかわらず使用後に削除します。コールバックの戻り値や生の例外も外へ返しません。通常の返却値は `{ consumed: true }` です。
+The helper makes the file retrievable only once and deletes it after use whether the callback succeeds or fails. It also never returns the callback's return value or raw exceptions. The normal return value is `{ consumed: true }`.
 
-ファイル受け渡しは1.0.10以降で使えます。下記の設定で公開版を起動します。`PROTON_PASS_DISABLE_SECRET_READ=1` は会話へ平文を返す `read_field` だけを無効化し、ファイル受け渡しは引き続き使えます。既存の `PROTON_PASS_ACCESS_POLICY` も併用できます。
+The file handoff is available since 1.0.10. Start the published version with the configuration below. `PROTON_PASS_DISABLE_SECRET_READ=1` disables only `read_field`, which returns plain text to the conversation; the file handoff remains available. An existing `PROTON_PASS_ACCESS_POLICY` can be used together with it.
 
 ```json
 {
@@ -68,22 +70,22 @@ await withFieldHandoff(receipt, async value => {
 }
 ```
 
-| 一時ファイルの設定 | 動作 |
+| Temporary file setting | Behavior |
 |---|---|
-| `PROTON_PASS_HANDOFF_TTL_SECONDS` | 有効期限。1〜300秒、既定60秒。取得ポリシーの期限が早ければそちらを優先 |
-| `PROTON_PASS_HANDOFF_DIR` | 任意の保管用ディレクトリ。既存の親を持つ正規化済みのローカル絶対パスが必要。UNC・ルートディレクトリそのものは指定不可。未指定はユーザー別の一時領域 |
+| `PROTON_PASS_HANDOFF_TTL_SECONDS` | Expiry. 1 to 300 seconds, default 60. If the access policy expires earlier, that takes precedence |
+| `PROTON_PASS_HANDOFF_DIR` | Optional storage directory. Must be a normalized local absolute path with an existing parent. UNC paths and the root directory itself are not allowed. If unset, a per-user temporary area is used |
 
-Windowsでは現在のユーザーだけを許可するACL、POSIXでは所有者限定のディレクトリ・ファイル権限を確認してから値を取得します。既存領域の権限が安全でない場合や、リンクを検出した場合は拒否します。権限を自動で緩めたり修復したりはしません。
+Before storing a value, the server verifies an ACL that allows only the current user on Windows, and owner-only directory and file permissions on POSIX. It refuses if an existing area has unsafe permissions or a link is detected. It never loosens or repairs permissions automatically.
 
-未使用ファイルは期限回収し、MCPサーバー終了時にも回収します。サーバーが突然終了した場合は監視プロセスが回収します。OS停止などで両方とも動けなかった場合は、次回の起動で期限切れを回収し、所有サーバーの停止を確認できた分は期限前でも回収します。削除に失敗した場合は成功扱いにせず、期限回収を継続します。起動時に既存領域の検証・回収に失敗した場合は起動を拒否するため、保存先とアクセス権を確認してください。
+Unused files are reclaimed at expiry and when the MCP server exits. If the server terminates abruptly, a watcher process reclaims them. If neither could run (for example because the OS stopped), the next start reclaims the expired ones, and also the ones whose owning server is confirmed stopped even before expiry. A failed deletion is not treated as success, and the expiry cleanup continues. If validating or reclaiming the existing area fails at startup, startup is refused, so check the storage location and access rights.
 
-この方式では値が会話へ出る経路を減らせますが、ローカルファイル・実行メモリ・ブラウザ内には平文が存在します。同じOSユーザーや管理者からの隔離、メモリやディスクの復元不能な消去、実行環境の全内部ログへの非保存は保証しません。Grok Botのようにファイルから直接入力できないクライアントでは、この方式での自動入力はできません。
+This approach reduces the paths by which a value reaches the conversation, but plain text exists in local files, execution memory, and the browser. It does not guarantee isolation from the same OS user or administrators, irrecoverable erasure of memory or disk, or that nothing is stored in any internal log of the execution environment. Clients that cannot type from a file directly, such as Grok Bot, cannot use this approach for automatic entry.
 
-### ログインに使いながら取得範囲を制限する
+### Log in while restricting what can be read
 
-まずProton側で、エージェント専用のPATに**必要なアイテムだけ・viewer（閲覧専用）・短い有効期限**を設定し、そのPATで認証した専用セッションを使うことを推奨します。保管庫全体を許可すると、その中の全アイテムがアクセス対象になります。PATの作成・期限・権限は [Proton公式のアクセス制御](https://protonpass.github.io/pass-cli/get-started/configuration/#access-control) を参照してください。このMCPはPATや既存セッションの権限を自動変更しません。
+On the Proton side, it is recommended to first create an agent-only PAT with **only the necessary items, viewer (read-only), and a short expiry**, and to use a dedicated session authenticated with that PAT. Allowing a whole vault makes every item in it accessible. For creating the PAT, its expiry, and its permissions, see the [official Proton access control](https://protonpass.github.io/pass-cli/get-started/configuration/#access-control). This MCP never changes the permissions of a PAT or an existing session automatically.
 
-MCP側でも `PROTON_PASS_ACCESS_POLICY` に次のようなJSONを指定できます。指定したアカウントの `username`・`password`・`totp` は引き続き取得でき、許可外のアイテムやフィールドはCLIを呼ぶ前に拒否します。
+On the MCP side, you can also set JSON like the following in `PROTON_PASS_ACCESS_POLICY`. The `username`, `password`, and `totp` of the specified account remain retrievable, and items or fields that are not allowed are refused before the CLI is called.
 
 ```json
 {
@@ -98,9 +100,9 @@ MCP側でも `PROTON_PASS_ACCESS_POLICY` に次のようなJSONを指定でき�
 }
 ```
 
-`SHARE_ID`・`ITEM_ID` は `list_vaults` / `list_shares` / `list_items` で確認して置き換えます。`fields` は保存されたアイテムで使う正確なフィールド名です。設定変更後はMCPサーバーを再起動してください。
+Replace `SHARE_ID` and `ITEM_ID` with values confirmed through `list_vaults` / `list_shares` / `list_items`. `fields` are the exact field names used by the stored item. Restart the MCP server after changing the settings.
 
-取得制限は1.0.10以降で使えます。次の設定で公開版を起動します。パスとIDは自分の配置先・許可するアイテムへ置き換えます。
+The access restriction is available since 1.0.10. Start the published version with the configuration below. Replace the paths and IDs with your own location and the items you allow.
 
 ```json
 {
@@ -118,36 +120,36 @@ MCP側でも `PROTON_PASS_ACCESS_POLICY` に次のようなJSONを指定でき�
 }
 ```
 
-| 設定項目 | 動作 |
+| Setting | Behavior |
 |---|---|
-| `allowed_items` | 必須。共有ID・アイテムID・フィールド名の完全一致で許可。空配列なら許可アイテムなしで一覧も空 |
-| `max_reads_per_minute` | 直近60秒の取得試行上限。1〜1000、既定10。許可されたフィールドのCLI試行は失敗時も数える |
-| `expires_at` | 任意。有効期限をタイムゾーン付きISO 8601で指定。例：`2027-01-01T00:00:00Z`。運用時は必要な期限へ置き換える |
+| `allowed_items` | Required. Allowed by exact match of share ID, item ID, and field name. An empty array means no allowed items and an empty list |
+| `max_reads_per_minute` | Limit on read attempts in the last 60 seconds. 1 to 1000, default 10. CLI attempts for allowed fields are counted even when they fail |
+| `expires_at` | Optional. The expiry as ISO 8601 with a time zone, for example `2027-01-01T00:00:00Z`. Replace it with the expiry you need when operating |
 
-設定中は一覧・タイトル検索も許可されたアイテムと共有に絞ります。ノート本文の照合から許可外の内容を推測する経路を残さないため、`search_notes` は拒否します。期限は処理開始時・認証確認後・結果返却前に確認し、途中で切れた場合も値を返しません。`session_status` は期限切れ後も接続状況を確認できます。
+While it is set, lists and title searches are also narrowed to the allowed items and shares. To leave no path for inferring disallowed content from note-body matching, `search_notes` is refused. The expiry is checked at the start of processing, after the authentication check, and before the result is returned, and no value is returned even if it expires midway. `session_status` can still report the connection state after expiry.
 
-環境変数が未設定なら従来どおり利用できます。設定JSONはUTF-8で64 KiB以内、許可アイテムは最大1000件、各アイテムのフィールドは重複なしの1〜32件です。空文字、不正JSON、未知の設定項目、重複した許可アイテムなどは起動を拒否します。許可を変更するMCPツールは提供していません。
+Without the environment variable, behavior is unchanged. The settings JSON must be UTF-8 and at most 64 KiB, with at most 1000 allowed items and 1 to 32 non-duplicate fields per item. Empty strings, invalid JSON, unknown settings, and duplicate allowed items are refused at startup. No MCP tool is provided that changes the permissions.
 
-この制限はMCP経由の誤取得や連続取得を抑えるためのものです。回数はサーバープロセスごとに保持し、再起動でリセットします。設定を書き換えたり、別のCLI・MCPプロセスを実行できる相手を隔離する仕組みではないため、Proton側のアクセス制御と組み合わせてください。
+This restriction is meant to curb accidental or repeated reads through the MCP. The count is held per server process and resets on restart. It is not a mechanism to isolate someone who can rewrite the settings or run another CLI or MCP process, so combine it with Proton's access control.
 
-`read_field` で取得した値はAIへ渡ります。接続先によるログ保存をこのMCPから禁止したり、取得済みのパスワードを期限切れで消したりすることはできません。ファイル受け渡しを使う場合も、入力先のブラウザURLはCodexの入力コードで確認してください。
+A value read with `read_field` is handed to the AI. This MCP cannot prohibit the connected side from storing logs, nor erase an already read password when it expires. Even when using the file handoff, confirm the browser URL of the entry target in the Codex entry code.
 
-### 平文を返す取得ツールを無効にする
+### Disable the tool that returns plain text
 
-`PROTON_PASS_DISABLE_SECRET_READ=1` は、平文を会話へ返す `read_field` を登録しない設定です。`0`・未設定では従来どおり登録し、その他の値は起動拒否です。`create_field_handoff` は引き続き使えるため、この設定のままCodexでファイル経由のログインができます。取得できる対象・フィールドを絞るには `PROTON_PASS_ACCESS_POLICY` を併用してください。このフラグだけで一切の秘密取得を禁止するものではありません。
+`PROTON_PASS_DISABLE_SECRET_READ=1` stops registering `read_field`, which returns plain text to the conversation. With `0` or unset it is registered as before, and any other value refuses startup. `create_field_handoff` remains available, so file-based login from Codex still works with this setting. To narrow the targets and fields that can be read, use it together with `PROTON_PASS_ACCESS_POLICY`. This flag alone does not prohibit all secret retrieval.
 
-## 導入
+## Installation
 
-Node.js 22以降が必要です。MCPサーバーをインストールした後、明示的な `setup` コマンドでProton公式の `pass-cli` を導入できます。
+Node.js 22 or later is required. After installing the MCP server, you can install the official Proton `pass-cli` with the explicit `setup` command.
 
 ```powershell
 npm install -g @kagayoi/proton-pass-mcp
 proton-pass-mcp setup
 ```
 
-`setup` はProton公式のstable manifestをHTTPSで取得し、現在のOS・CPUに対応する公式配布物をダウンロードします。manifestに記載されたSHA-256と実物が一致した場合だけ展開・配置し、復元不能時に案内する旧版バックアップを除いて一時ファイルを削除します。ログイン、PATの読み取り・保存、PATHの変更は行いません。
+`setup` fetches Proton's official stable manifest over HTTPS and downloads the official build for the current OS and CPU. It extracts and places it only if the SHA-256 in the manifest matches the actual file, and deletes temporary files except for the previous-version backup it points to when restoration is impossible. It does not log in, read or store a PAT, or change PATH.
 
-`PASS_CLI_PATH` を指定した場合、MCP起動と `--force` を付けない `setup` はその実行ファイルだけを利用します。指定先が無効でも公式の既定配置先や `PATH` へフォールバックせず、安全のため失敗します。省略した場合は、指定した導入先（未指定なら公式の既定配置先）、`PATH` の順に既存CLIを探し、見つかればダウンロードしません。stable版を公式の既定配置先へ明示的に再導入するときは、既存CLIの探索を省略する `--force` を使います。任意の配置先への導入を保証する場合は `--force` と `--install-dir` を併用してください。
+When `PASS_CLI_PATH` is specified, MCP startup and `setup` without `--force` use only that executable. Even if the target is invalid, it does not fall back to the official default location or `PATH`, and fails for safety. When omitted, it looks for an existing CLI in the specified install directory (the official default location if unspecified), then in `PATH`, and does not download if one is found. To explicitly reinstall the stable version into the official default location, use `--force`, which skips the search for an existing CLI. To guarantee installation into an arbitrary location, use `--force` together with `--install-dir`.
 
 ```powershell
 proton-pass-mcp setup --force
@@ -155,21 +157,21 @@ proton-pass-mcp setup --force --install-dir 'D:\Tools\ProtonPass'
 proton-pass-mcp setup --help
 ```
 
-公式の既定配置先は次のとおりです。
+The official default locations are as follows.
 
-| OS | 対応CPU | 配置先 |
+| OS | Supported CPU | Location |
 |---|---|---|
 | Windows | x64 | `%LOCALAPPDATA%\Programs\ProtonPass\pass-cli.exe` |
 | macOS | Apple Silicon / x64 | `~/.local/bin/pass-cli` |
 | Linux | arm64 / x64 | `~/.local/bin/pass-cli` |
 
-対応外のOS・CPU、manifest形式の変更、危険なダウンロードURL、サイズ上限超過、SHA-256不一致では、既存のCLIを上書きせず終了します。Proton公式の配布manifestとインストーラーは [Proton Pass CLI](https://github.com/protonpass/pass-cli) で確認できます。
+For an unsupported OS or CPU, a changed manifest format, a dangerous download URL, an exceeded size limit, or a SHA-256 mismatch, it exits without overwriting the existing CLI. Proton's official distribution manifest and installer are available at [Proton Pass CLI](https://github.com/protonpass/pass-cli).
 
-### CLIを認証する
+### Authenticate the CLI
 
-`setup` と認証は分離されています。MCP専用のセッションディレクトリを決め、同じ環境変数を設定した状態で `pass-cli login` を一度実行してください。
+`setup` and authentication are separate. Decide a session directory dedicated to the MCP, and run `pass-cli login` once with the same environment variable set.
 
-Windows PowerShellの例:
+Windows PowerShell example:
 
 ```powershell
 $env:PROTON_PASS_SESSION_DIR = "$env:LOCALAPPDATA\Kagayoi\ProtonPassMcp\session"
@@ -178,7 +180,7 @@ New-Item -ItemType Directory -Force $env:PROTON_PASS_SESSION_DIR | Out-Null
 & "$env:LOCALAPPDATA\Programs\ProtonPass\pass-cli.exe" info
 ```
 
-macOS・Linuxの例:
+macOS and Linux example:
 
 ```bash
 export PROTON_PASS_SESSION_DIR="$HOME/.local/share/proton-pass-mcp/session"
@@ -187,11 +189,11 @@ mkdir -p "$PROTON_PASS_SESSION_DIR"
 "$HOME/.local/bin/pass-cli" info
 ```
 
-既存の `pass-cli` を利用する場合や `--install-dir` を指定した場合は、その実行ファイルの絶対パスを `PASS_CLI_PATH` に設定します。認証方法の詳細はProton公式の [Pass CLIドキュメント](https://protonpass.github.io/pass-cli/) を参照してください。
+When using an existing `pass-cli` or when you specified `--install-dir`, set the absolute path of that executable in `PASS_CLI_PATH`. For details on authentication, see Proton's official [Pass CLI documentation](https://protonpass.github.io/pass-cli/).
 
-### MCPクライアントへ登録する
+### Register with an MCP client
 
-MCPクライアントには次のstdio設定を登録します。`PASS_CLI_PATH` は省略すると既定配置先または `PATH` から自動検出されますが、実行するCLIを固定したい場合は明示してください。Windowsでクライアントが `npx` を解決できない場合は、そのクライアントの手順に従って `npx.cmd` またはインストール済みサーバーの絶対パスを指定してください。
+Register the following stdio configuration with your MCP client. If `PASS_CLI_PATH` is omitted, the CLI is auto-detected from the default location or `PATH`, but specify it explicitly if you want to pin the CLI to run. On Windows, if the client cannot resolve `npx`, follow that client's instructions and specify `npx.cmd` or the absolute path of the installed server.
 
 ```json
 {
@@ -208,20 +210,20 @@ MCPクライアントには次のstdio設定を登録します。`PASS_CLI_PATH`
 }
 ```
 
-`@latest` を指定すると、MCPクライアントがサーバーを起動するたびにnpmの最新版を使います。すでに `@kagayoi/proton-pass-mcp@1.0.11` のような固定版で登録している場合は、登録済みの起動引数を `@kagayoi/proton-pass-mcp@latest` に書き換えると以後は自動で最新版になります（READMEの更新だけでは既存の登録は変わりません）。特定の版に固定したい場合は、この固定版の形式で登録してください。
+With `@latest`, the MCP client uses the latest npm version every time it starts the server. If you have already registered a pinned version such as `@kagayoi/proton-pass-mcp@1.0.12`, rewrite the registered start argument to `@kagayoi/proton-pass-mcp@latest` and it will automatically use the latest version from then on (updating this README alone does not change existing registrations). To pin a specific version, register it in this pinned-version form.
 
-自動検出を使う場合は `PASS_CLI_PATH` の行を削除できます。独自のCLI配置先では、その実行ファイルの絶対パスへ変更してください。PATは設定ファイルに保存せず、既存セッションを参照します。秘密の本文やCLIの生エラーをこのサーバーがログへ保存することはありません。フィールド取得の結果は接続先クライアントに渡ります。
+If you use auto-detection, you can delete the `PASS_CLI_PATH` line. For a custom CLI location, change it to the absolute path of that executable. The PAT is not stored in the settings file; the existing session is referenced. This server never saves secret bodies or raw CLI errors to logs. The result of a field read is handed to the connected client.
 
-「有効なセッションがありません」と表示された場合は、MCPと同じ `PROTON_PASS_SESSION_DIR` を設定して `pass-cli info` で確認します。この表示だけでは期限切れ・失効・保存先の相違を特定できません。保存先が正しく認証が必要な場合は、その保存先で `pass-cli login` により再認証します。CLIが明示した自動ログアウトは別のメッセージで通知します。MCP自身はログアウトやトークンの保存を行いません。
+If a message says there is no valid session, set the same `PROTON_PASS_SESSION_DIR` as the MCP and check with `pass-cli info`. This message alone cannot tell whether the session expired, was revoked, or the storage location differs. If the location is correct and authentication is required, re-authenticate with `pass-cli login` for that location. An automatic logout explicitly reported by the CLI is announced with a different message. The MCP itself never logs out or stores tokens.
 
-`setup` が既存CLIを見つけられない場合は、`PASS_CLI_PATH` を指定しているなら、その値が正しい実行ファイルを指しているか確認します。自動検出を使うならこの変数を削除し、公式の既定配置先にファイルがあるか、現在のプロセスから `PATH` が見えるかを確認します。Windows ZIPの展開に失敗した場合はWindows PowerShellが利用できることと公式配布物の取得状態を確認してください。SHA-256検証に失敗した場合は検証を無効化せず、公式側のmanifestと配布物が一致してから再実行してください。
+If `setup` cannot find an existing CLI and you specified `PASS_CLI_PATH`, check that the value points to the correct executable. If you use auto-detection, delete this variable and check whether the file exists in the official default location and whether `PATH` is visible from the current process. If extracting the Windows ZIP fails, check that Windows PowerShell is available and the state of the official download. If SHA-256 verification fails, do not disable the verification; rerun after Proton's manifest and the distribution match.
 
-更新途中の失敗では既存ファイルを自動復元します。復元にも失敗した場合は、エラーに表示された一時バックアップを削除せず、CLIを停止してから再実行するか、バックアップ内のファイルを導入先へ戻してください。
+If an update fails midway, the existing files are restored automatically. If restoration also fails, do not delete the temporary backup shown in the error; stop the CLI and rerun, or put the files in the backup back into the install directory.
 
-Windowsで `LOCALAPPDATA` が未設定でも、`PASS_CLI_PATH` または `PATH` 上の既存CLIを利用できます。新規導入で既定の配置先を決定できない場合は、`LOCALAPPDATA` を設定するか、`setup --install-dir` で配置先を指定してください。
+On Windows, even when `LOCALAPPDATA` is unset, an existing CLI from `PASS_CLI_PATH` or on `PATH` can be used. If the default location cannot be determined for a fresh install, set `LOCALAPPDATA` or specify the location with `setup --install-dir`.
 
-## ライセンス
+## License
 
-このMCPサーバーは [MIT License](LICENSE) です。`setup` で別途導入するProton Pass CLIはProtonの [GPL-3.0 License](https://github.com/protonpass/pass-cli/blob/main/LICENSE) に従い、このnpmパッケージにはCLIバイナリを同梱しません。
+This MCP server is under the [MIT License](LICENSE). The Proton Pass CLI installed separately by `setup` follows Proton's [GPL-3.0 License](https://github.com/protonpass/pass-cli/blob/main/LICENSE), and this npm package does not bundle the CLI binary.
 
-開発・検証については [CONTRIBUTING.md](CONTRIBUTING.md)、システムの構造については [DESIGN.md](DESIGN.md) を参照してください。
+For development and verification, see [CONTRIBUTING.md](CONTRIBUTING.md); for the structure of the system, see [DESIGN.md](DESIGN.md).

@@ -22,6 +22,10 @@
 
 ## 実装上の制約
 
+- 多言語化の方針は `D:DevAPP-DISTRIBUTION.md` の「ローカライズ」を正本とする。人が読む文言（`setup` と `--help` の出力、標準エラーへの案内）は `src/i18n.mjs` の `t()` と `src/locales/<タグ>.json`（ja・en・zh-CN・zh-TW・ko・es・fr・de・pt-BR）で扱い、言語は `PROTON_PASS_MCP_LANGUAGE` → `LC_ALL` → `LC_MESSAGES` → `LANG` → OS の表示言語 → 英語の順で決める。人が読む文言を足したら、9言語の辞書を同じキー・同じプレースホルダーで更新し、`test/i18n.test.mjs` を通す。
+- MCP のツール名・説明・入力スキーマの説明・AI に返す応答とエラー（`PassError` の文言を含む）は英語に統一し、訳し分けない。ツール名・引数・応答の形は変えない。
+- README は英語の `README.md` を正本とし、`README.ja.md`・`README.zh-CN.md`・`README.zh-TW.md`・`README.ko.md`・`README.es.md`・`README.fr.md`・`README.de.md`・`README.pt-BR.md` を置く。README を変えたときは全言語版を同時に直す（コマンド・パス・設定キー・製品名・URL・パッケージ名は訳さない）。各版の `@kagayoi/proton-pass-mcp@<版>` の文字列は版上げのたびに全ファイルで揃え、`scripts/Verify-BunPackage.ps1` が全言語版を検査する。
+
 - ツール追加・変更時は strict な入力スキーマ、読み取り専用の CLI 操作、ツール単位の直列実行を維持する。
 - MCP からの `pass-cli` 実行は `runCli` を経由し、引数配列と `shell: false`、タイムアウト、出力上限、キャンセル伝播を維持する。
 - 一覧と検索結果は許可したメタデータだけを返し、秘密値が必要な取得は理由付きの `read_field` または `create_field_handoff` を使う。ファイル方式は秘密をMCP応答に含めず、consumerも値・コールバック結果・生例外を表示しない。CLI の生エラーは分類した `PassError` に置き換える。

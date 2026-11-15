@@ -11,6 +11,7 @@
 | `src/cli.mjs` | 引数なしではstdio MCPサーバーを起動し、`setup` サブコマンドではCLI導入処理へ分岐する。未知のコマンドをMCP起動として扱わない。 |
 | `src/server.mjs` | 環境変数からクライアントを生成し、manifest のバージョンで MCP サーバーを登録する。Zod の strict スキーマで入力を制限し、設定に応じた7または8ツールの処理を直列化する。成功時は JSON テキストと `structuredContent`、失敗時は安全なエラー文を返す。 |
 | `src/setup.mjs` | 既存CLIを優先して検出する。明示的な `setup` ではProton公式manifestから対象配布物とSHA-256を取得し、検証済みの実物だけを公式の既定配置先または指定先へ導入する。 |
+| `src/i18n.mjs` と `src/locales/*.json` | 人が読む文言を9言語の辞書から選ぶ。言語は `PROTON_PASS_MCP_LANGUAGE` → `LC_ALL` → `LC_MESSAGES` → `LANG` → OS の表示言語 → 英語の順で判定し、辞書に無いキーは英語へ戻す。AI が読む MCP の説明・応答・エラーは対象外で英語に統一する。 |
 | `src/inputs.mjs` | ID・理由・フィールド名の入力スキーマを定義し、サーバー・ポリシー・入力境界テストで共有する。 |
 | `src/access-policy.mjs` | 任意の取得制限を起動時に検証し、許可アイテム・フィールド・期限・プロセス内の取得頻度を判定する。 |
 | `src/handoff-*.mjs` | 保護された一時ファイルの作成・一回だけの利用・回収と、監視プロセスによる期限・異常終了時の回収を担当する。consumerはブラウザ実行環境で読める依存だけを使う。 |

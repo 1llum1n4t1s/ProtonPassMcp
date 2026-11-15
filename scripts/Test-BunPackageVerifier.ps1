@@ -7,7 +7,7 @@ $source = [IO.File]::ReadAllBytes((Resolve-Path -LiteralPath $PackageFile).Provi
 $verifier = Join-Path $PSScriptRoot 'Verify-BunPackage.ps1'
 $result = & $verifier -PackageFile $PackageFile
 $expectedHash = 'sha512-' + [Convert]::ToBase64String([Security.Cryptography.SHA512]::HashData($source))
-if ($result.Integrity -cne $expectedHash -or $result.Files -ne 15) { throw 'Valid archive verification failed' }
+if ($result.Integrity -cne $expectedHash -or $result.Files -ne 33) { throw 'Valid archive verification failed' }
 
 function New-Fixture([string] $Kind, [string] $Path) {
     $inputStream = [IO.MemoryStream]::new($source, $false)
@@ -27,7 +27,7 @@ function New-Fixture([string] $Kind, [string] $Path) {
                 $manifest['description'] = 'changed'
                 $bytes = [Text.Encoding]::UTF8.GetBytes($manifest.ToJsonString())
             }
-            if ($Kind -ceq 'version' -and $entry.Name -cin @('package/package.json', 'package/README.md')) {
+            if ($Kind -ceq 'version' -and ($entry.Name -ceq 'package/package.json' -or $entry.Name -clike 'package/README*.md')) {
                 $bytes = [IO.File]::ReadAllBytes((Join-Path $versionRoot $entry.Name.Substring('package/'.Length)))
             }
             if ($Kind -ceq 'type' -and $entry.Name -ceq 'package/src/access-policy.mjs') {
@@ -81,6 +81,9 @@ Copy-Item -LiteralPath (Join-Path (Split-Path -Parent $PSScriptRoot) 'src') -Des
 foreach ($file in @('package.json', 'README.md', 'CHANGELOG.md', 'LICENSE')) {
     Copy-Item -LiteralPath (Join-Path (Split-Path -Parent $PSScriptRoot) $file) -Destination $versionRoot
 }
+foreach ($translated in Get-ChildItem -LiteralPath (Split-Path -Parent $PSScriptRoot) -File -Filter 'README.*.md') {
+    Copy-Item -LiteralPath $translated.FullName -Destination $versionRoot
+}
 Copy-Item -LiteralPath $verifier -Destination (Join-Path $versionRoot 'scripts')
 $manifestPath = Join-Path $versionRoot 'package.json'
 $readmePath = Join-Path $versionRoot 'README.md'
@@ -97,12 +100,18 @@ $versions = @(
     @{ Value = '1.2.3+metadata'; Accept = $false },
     @{ Value = '1.2.3-'; Accept = $false }
 )
+$originalTranslated = @{}
+foreach ($translated in Get-ChildItem -LiteralPath $versionRoot -File -Filter 'README.*.md') { $originalTranslated[$translated.Name] = [IO.File]::ReadAllText($translated.FullName) }
 $index = 0
 foreach ($case in $versions) {
     $manifest = [System.Text.Json.Nodes.JsonNode]::Parse($originalManifest)
     $manifest['version'] = $case.Value
     [IO.File]::WriteAllText($manifestPath, $manifest.ToJsonString())
     [IO.File]::WriteAllText($readmePath, $originalReadme.Replace($oldReference, $original['name'].GetValue[string]() + '@' + $case.Value))
+    # 他言語のREADMEも同じ版へ揃える。
+    foreach ($translated in Get-ChildItem -LiteralPath $versionRoot -File -Filter 'README.*.md') {
+        [IO.File]::WriteAllText($translated.FullName, $originalTranslated[$translated.Name].Replace($oldReference, $original['name'].GetValue[string]() + '@' + $case.Value))
+    }
     $fixture = Join-Path $WorkDirectory ("version-$index.tgz")
     New-Fixture 'version' $fixture
     $message = $null
@@ -113,4 +122,19 @@ foreach ($case in $versions) {
     }
     $index++
 }
-Write-Output 'Bun package verifier: valid archive, 7 archive rejections, 2 prereleases and 5 invalid versions passed'
+# 他言語のREADMEだけ旧版のまま残った場合は拒否する。
+$manifest = [System.Text.Json.Nodes.JsonNode]::Parse($originalManifest)
+$manifest['version'] = '1.1.0'
+[IO.File]::WriteAllText($manifestPath, $manifest.ToJsonString())
+[IO.File]::WriteAllText($readmePath, $originalReadme.Replace($oldReference, $original['name'].GetValue[string]() + '@1.1.0'))
+foreach ($translated in Get-ChildItem -LiteralPath $versionRoot -File -Filter 'README.*.md') {
+    [IO.File]::WriteAllText($translated.FullName, $originalTranslated[$translated.Name])
+}
+$fixture = Join-Path $WorkDirectory 'stale-translation.tgz'
+New-Fixture 'version' $fixture
+$message = $null
+try { $null = & (Join-Path $versionRoot 'scripts/Verify-BunPackage.ps1') -PackageFile $fixture } catch { $message = $_.Exception.Message }
+if (-not $message -or -not $message.Contains('README package version differs: README.', [StringComparison]::Ordinal)) {
+    throw "Verifier accepted a stale translated README: $message"
+}
+Write-Output 'Bun package verifier: valid archive, 7 archive rejections, 2 prereleases, 5 invalid versions and a stale translated README passed'
