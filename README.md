@@ -2,7 +2,7 @@
 
 既存の `pass-cli` 認証セッションを使って、MCPクライアントからProton Passを検索するローカルMCPサーバーです。Proton公式の製品ではありません。
 
-Node.js を使わない場合は Bun 1.4.4 以降をインストールし、以下の `npx` と引数をそれぞれ `bun` と `["x", "--bun", "@kagayoi/proton-pass-mcp@1.0.10"]` に変更してください。`--bun` は Node.js の代わりに Bun で実行するために必要です。既存の `npx` 設定も Node.js 22 以降で利用できます。
+Node.js を使わない場合は Bun 1.4.4 以降をインストールし、以下の `"command": "npx"` と `"args": ["--yes", "@kagayoi/proton-pass-mcp@latest"]` をそれぞれ `"command": "bunx"` と `"args": ["--bun", "@kagayoi/proton-pass-mcp@latest"]` に変更してください（コマンドでは `bunx --bun @kagayoi/proton-pass-mcp@latest`）。`--bun` は Node.js の代わりに Bun で実行するために必要です。既存の `npx` 設定も Node.js 22 以降で利用できます。
 
 ## 利用できる機能
 
@@ -57,7 +57,7 @@ await withFieldHandoff(receipt, async value => {
   "mcpServers": {
     "proton-pass": {
       "command": "npx",
-      "args": ["--yes", "@kagayoi/proton-pass-mcp@1.0.10"],
+      "args": ["--yes", "@kagayoi/proton-pass-mcp@latest"],
       "env": {
         "PASS_CLI_PATH": "C:/Users/USER/AppData/Local/Programs/ProtonPass/pass-cli.exe",
         "PROTON_PASS_SESSION_DIR": "C:/Users/USER/AppData/Local/Kagayoi/ProtonPassMcp/session",
@@ -107,7 +107,7 @@ MCP側でも `PROTON_PASS_ACCESS_POLICY` に次のようなJSONを指定でき�
   "mcpServers": {
     "proton-pass": {
       "command": "npx",
-      "args": ["--yes", "@kagayoi/proton-pass-mcp@1.0.10"],
+      "args": ["--yes", "@kagayoi/proton-pass-mcp@latest"],
       "env": {
         "PASS_CLI_PATH": "C:/Users/USER/AppData/Local/Programs/ProtonPass/pass-cli.exe",
         "PROTON_PASS_SESSION_DIR": "C:/Users/USER/AppData/Local/Kagayoi/ProtonPassMcp/session",
@@ -198,7 +198,7 @@ MCPクライアントには次のstdio設定を登録します。`PASS_CLI_PATH`
   "mcpServers": {
     "proton-pass": {
       "command": "npx",
-      "args": ["--yes", "@kagayoi/proton-pass-mcp@1.0.10"],
+      "args": ["--yes", "@kagayoi/proton-pass-mcp@latest"],
       "env": {
         "PASS_CLI_PATH": "C:/Users/USER/AppData/Local/Programs/ProtonPass/pass-cli.exe",
         "PROTON_PASS_SESSION_DIR": "C:/Users/USER/AppData/Local/Kagayoi/ProtonPassMcp/session"
@@ -207,6 +207,8 @@ MCPクライアントには次のstdio設定を登録します。`PASS_CLI_PATH`
   }
 }
 ```
+
+`@latest` を指定すると、MCPクライアントがサーバーを起動するたびにnpmの最新版を使います。すでに `@kagayoi/proton-pass-mcp@1.0.11` のような固定版で登録している場合は、登録済みの起動引数を `@kagayoi/proton-pass-mcp@latest` に書き換えると以後は自動で最新版になります（READMEの更新だけでは既存の登録は変わりません）。特定の版に固定したい場合は、この固定版の形式で登録してください。
 
 自動検出を使う場合は `PASS_CLI_PATH` の行を削除できます。独自のCLI配置先では、その実行ファイルの絶対パスへ変更してください。PATは設定ファイルに保存せず、既存セッションを参照します。秘密の本文やCLIの生エラーをこのサーバーがログへ保存することはありません。フィールド取得の結果は接続先クライアントに渡ります。
 
