@@ -128,6 +128,11 @@ namespace Kagayoi.Npm
                 return Task.FromResult(Bundle(publication, Mode == "subject"));
             }
         }
+        private sealed class UnreadableContent : HttpContent
+        {
+            protected override Task SerializeToStreamAsync(Stream stream, TransportContext context) => throw new IOException("Fixture response body cannot be read");
+            protected override bool TryComputeLength(out long length) { length = 0; return false; }
+        }
         private sealed class RegistryHandler : HttpMessageHandler
         {
             public Publication Publication;
@@ -162,7 +167,7 @@ namespace Kagayoi.Npm
                         if (Mode == "timeout") { await Task.Delay(Timeout.Infinite, ct); }
                         return Response(HttpStatusCode.NotFound, "{}");
                     }
-                    return Response(HttpStatusCode.OK, new JsonObject { ["dist"] = new JsonObject { ["integrity"] = Publication.Integrity, ["attestations"] = Mode == "confirmation" ? null : ReplaceAttestation ? Attestation?.DeepClone() : Provenance() } }.ToJsonString());
+                    throw new InvalidOperationException("Unexpected post-PUT registry lookup");
                 }
                 if (request.RequestUri.Host.EndsWith(".actions.githubusercontent.com", StringComparison.Ordinal))
                 {
@@ -174,7 +179,7 @@ namespace Kagayoi.Npm
                 {
                     Check(url == Publisher.Registry + "-/npm/v1/oidc/token/exchange/package/@fixture%2fpackage", "OIDC exchange endpoint");
                     Check(token == "fixture-identity", "OIDC exchange bearer");
-                    return Response(HttpStatusCode.OK, Mode == "exchange-empty" ? "{}" : "{\"token\":\"fixture-registry-token\"}");
+                    return Response(HttpStatusCode.OK, Mode == "exchange-invalid-json" ? "invalid" : Mode == "exchange-empty" ? "{}" : "{\"token\":\"fixture-registry-token\"}");
                 }
                 Check(request.Method == HttpMethod.Put && url == Publisher.Registry + "@fixture%2fpackage", "Unexpected publication endpoint");
                 Check(token == "fixture-registry-token", "Registry upload bearer");
@@ -184,7 +189,8 @@ namespace Kagayoi.Npm
                 Check(Convert.FromBase64String(Publisher.Text(attachment["data"])).SequenceEqual(Publication.Bytes), "Uploaded tarball differs from verified snapshot");
                 Check(metadata["_attachments"]["@fixture/package-1.2.3.sigstore"] != null, "Missing provenance attachment");
                 if (Mode == "put-lost") throw new HttpRequestException("fixture-secret-must-not-leak");
-                return Response(Mode == "put-reject" ? HttpStatusCode.Forbidden : HttpStatusCode.Created, "{}");
+                if (Mode == "put-body-fail") return new HttpResponseMessage(HttpStatusCode.Created) { Content = new UnreadableContent() };
+                return Response(Mode == "put-reject" ? HttpStatusCode.Forbidden : HttpStatusCode.Created, Mode == "put-text" ? "Created" : Mode == "put-empty" ? "" : "{}");
             }
         }
         private sealed class Commands : ICommandRunner
@@ -246,19 +252,23 @@ namespace Kagayoi.Npm
             wrongContext = new Dictionary<string, string>(env); wrongContext["GITHUB_WORKFLOW_REF"] = "other/repo/.github/workflows/publish.yml@main";
             Fails(() => Publisher.Prepare(file, Integrity(file), null, wrongContext), "workflow identity");
 
-            foreach (var mode in new[] { "success", "existing", "conflict", "unknown", "redirect", "invalid-json", "empty-lookup", "null-lookup", "timeout", "oidc-empty", "exchange-empty", "put-reject", "put-lost", "confirmation", "subject", "fail" })
+            foreach (var mode in new[] { "success", "put-body-fail", "put-empty", "put-text", "post-throw", "existing", "conflict", "unknown", "redirect", "invalid-json", "empty-lookup", "null-lookup", "timeout", "oidc-empty", "exchange-empty", "exchange-invalid-json", "put-reject", "put-lost", "subject", "fail" })
             {
                 publication = Publisher.Prepare(file, Integrity(file), null, env);
                 var handler = new RegistryHandler { Publication = publication, Mode = mode };
                 using (var client = new HttpClient(handler) { Timeout = mode == "timeout" ? TimeSpan.FromMilliseconds(25) : TimeSpan.FromSeconds(5) })
                 {
                     var signer = new Signer { Mode = mode };
-                    if (mode == "success" || mode == "existing") Check(Publisher.Run(file, Integrity(file), null, false, env, client, signer, true).Contains("archive", StringComparison.Ordinal), "Publish result");
-                    else Fails(() => Publisher.Run(file, Integrity(file), null, false, env, client, signer, true), new Dictionary<string, string> { ["conflict"] = "different archive", ["unknown"] = "HTTP 503", ["redirect"] = "HTTP 302", ["invalid-json"] = "invalid JSON", ["empty-lookup"] = "no document", ["null-lookup"] = "invalid JSON", ["timeout"] = "response unknown", ["oidc-empty"] = "no identity token", ["exchange-empty"] = "no token", ["put-reject"] = "HTTP 403", ["put-lost"] = "response unknown", ["confirmation"] = "confirmation failed", ["subject"] = "subject mismatch", ["fail"] = "signer failed" }[mode]);
+                    if (new[] { "success", "put-body-fail", "put-empty", "put-text", "post-throw", "existing" }.Contains(mode))
+                    {
+                        var result = Publisher.Run(file, Integrity(file), null, false, env, client, signer, true);
+                        Check(result.StartsWith(mode == "existing" ? "Already published identical archive:" : "npm accepted publication:", StringComparison.Ordinal), "Publish result");
+                        if (mode != "existing") Check(handler.Gets == 1 && handler.Calls == 4 && handler.Puts == 1 && signer.Calls == 1 && handler.Methods.SequenceEqual(new[] { "GET", "GET", "POST", "PUT" }), "Acceptance repeated auth/sign/PUT or fetched public version");
+                    }
+                    else Fails(() => Publisher.Run(file, Integrity(file), null, false, env, client, signer, true), new Dictionary<string, string> { ["conflict"] = "different archive", ["unknown"] = "HTTP 503", ["redirect"] = "HTTP 302", ["invalid-json"] = "invalid JSON", ["empty-lookup"] = "no document", ["null-lookup"] = "invalid JSON", ["timeout"] = "response unknown", ["oidc-empty"] = "no identity token", ["exchange-empty"] = "no token", ["exchange-invalid-json"] = "invalid JSON", ["put-reject"] = "HTTP 403", ["put-lost"] = "response unknown", ["subject"] = "subject mismatch", ["fail"] = "signer failed" }[mode]);
                     Check(handler.Puts <= 1, "Ambiguous PUT was retried");
                     if (new[] { "existing", "conflict", "unknown", "redirect", "invalid-json", "empty-lookup", "null-lookup", "timeout" }.Contains(mode)) Check(handler.Calls == 1 && signer.Calls == 0, "Lookup failure/duplicate continued to credentials or signing");
                     if (mode == "subject" || mode == "fail") Check(handler.Puts == 0, "Signing failure uploaded package");
-                    if (mode == "put-lost" || mode == "put-reject") Check(handler.Gets == 1, "Rejected/unknown PUT incorrectly confirmed");
                 }
             }
             foreach (var url in new[] { "http://fixture.actions.githubusercontent.com/token", "https://actions.githubusercontent.com.attacker.invalid/token", "https://registry.npmjs.org/token" })
@@ -282,7 +292,7 @@ namespace Kagayoi.Npm
                 new JsonObject { ["url"] = "https://registry.npmjs.org/-/npm/v1/attestations/@fixture%252fpackage@1.2.3", ["provenance"] = new JsonObject { ["predicateType"] = "https://slsa.dev/provenance/v1" } }
             })
             {
-                foreach (var existing in new[] { false, true })
+                foreach (var existing in new[] { true })
                 {
                     publication = Publisher.Prepare(file, Integrity(file), null, env);
                     var handler = new RegistryHandler { Publication = publication, Existing = existing, ReplaceAttestation = true, Attestation = shape };

@@ -25,7 +25,7 @@ bun test
 
 公開処理は scripts/Publish-Npm.ps1 を入口とし、PowerShell 7.4以降のAdd-Typeが同梱C#をメモリー内でコンパイルします。npm Trusted Publishingとprovenanceのcloud-hosted build要件に合わせ、publish.ymlのinstall・既存テスト・pack・配布内容とSHA-512検証・公開をGitHub-hosted ubuntu-latestで実行します。通常のdependency-validationはM3 Linux ARM64を使います。同じtarballを作り直さず公開し、保存npm公開tokenは使いません。既存のworkflow filenameとrelease/manual条件、npm側のTrusted Publisher登録を維持します。
 
-native publisherはGitHub OIDC交換による短期tokenとcosign 3.0.4によるSLSA v1 provenance署名を使います。cosignの固定SHA-256・公式Sigstore署名、workflow identity・issuer・subject・archive digestを確認し、同じtarballと一緒に送信します。既存版の省略にはSHA-512とprovenance掲載形式の一致を要求します。PUT成功後はregistryのSHA-512とprovenance掲載形式を再確認します。不明なPUT結果は再送しません。ソースhash別namespaceのPowerShell読込みも維持します。
+native publisherはGitHub OIDC交換による短期tokenとcosign 3.0.4によるSLSA v1 provenance署名を使います。cosignの固定SHA-256・公式Sigstore署名、workflow identity・issuer・subject・archive digestを確認し、同じtarballと一緒に送信します。既存版の省略にはSHA-512とprovenance掲載形式の一致を要求します。PUT成功headerはnpm受理を表し、body解析や公開反映待ちGETは行いません。不明なPUT結果は再送しません。ソースhash別namespaceのPowerShell読込みも維持します。
 
 公開処理の変更時は `pwsh -NoProfile -File scripts/Test-NpmPublisher.ps1 -WorkDirectory <専用の絶対作業パス>` を実行します。実資格情報・実外部APIを使わず、fixture tarball、mock HTTP/cosign、再送しないHTTP境界を確認します。新規公開を許すversion照会応答は404だけです。試験fixtureは専用pathへ置き、終了時に清掃します。
 

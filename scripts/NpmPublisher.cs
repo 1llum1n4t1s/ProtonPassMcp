@@ -138,19 +138,20 @@ namespace Kagayoi.Npm
             return new Publication { PackageFile = packageFile, Bytes = bytes, Integrity = integrity, Digest = digest, Name = name, Version = version, Statement = statement, Metadata = metadata };
         }
 
-        internal static async Task<JsonNode> Send(HttpClient client, string method, string url, string token, JsonNode body = null, bool allowMissing = false)
+        internal static async Task<JsonNode> Send(HttpClient client, string method, string url, string token, JsonNode body = null, bool allowMissing = false, bool ignoreSuccessBody = false)
         {
             using (var request = new HttpRequestMessage(new HttpMethod(method), url))
             {
                 if (!string.IsNullOrEmpty(token)) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
                 if (body != null) request.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
                 HttpResponseMessage response;
-                try { response = await client.SendAsync(request).ConfigureAwait(false); }
+                try { response = await client.SendAsync(request, ignoreSuccessBody ? HttpCompletionOption.ResponseHeadersRead : HttpCompletionOption.ResponseContentRead).ConfigureAwait(false); }
                 catch { throw new InvalidOperationException("Native npm request failed (" + method + "); response unknown. Inspect registry before retrying."); }
                 using (response)
                 {
                     if (allowMissing && response.StatusCode == HttpStatusCode.NotFound) return null;
                     Require(response.IsSuccessStatusCode, "Native npm request rejected (" + method + " HTTP " + (int)response.StatusCode + ").");
+                    if (ignoreSuccessBody) return null;
                     var text = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                     if (string.IsNullOrEmpty(text))
                     {
@@ -195,10 +196,8 @@ namespace Kagayoi.Npm
             Require(subjects != null && subjects.Count == 1 && Text(subjects[0]?["name"]) == Text(publication.Statement["subject"]?[0]?["name"]) && Text(subjects[0]?["digest"]?["sha512"]) == publication.Digest, "Signed npm provenance subject mismatch.");
             publication.Metadata["_attachments"][publication.Name + "-" + publication.Version + ".sigstore"] = new JsonObject { ["content_type"] = Text(bundle["mediaType"]), ["data"] = bundleText, ["length"] = bundleText.Length };
             Require(Convert.ToHexString(SHA512.HashData(File.ReadAllBytes(publication.PackageFile))).ToLowerInvariant() == publication.Digest, "Archive changed after verification.");
-            await Send(client, "PUT", Registry + escapedName, Text(exchange["token"]), publication.Metadata).ConfigureAwait(false);
-            var published = await Send(client, "GET", versionUrl, "").ConfigureAwait(false);
-            Require(Text(published?["dist"]?["integrity"]) == publication.Integrity && HasProvenance(published, publication.Name, publication.Version), "Published npm archive/provenance confirmation failed.");
-            return "Published verified archive with GitHub OIDC and provenance: " + publication.Name + "@" + publication.Version;
+            await Send(client, "PUT", Registry + escapedName, Text(exchange["token"]), publication.Metadata, ignoreSuccessBody: true).ConfigureAwait(false);
+            return "npm accepted publication: " + publication.Name + "@" + publication.Version;
         }
     }
 
