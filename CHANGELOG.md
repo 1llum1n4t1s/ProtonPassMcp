@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.11 - 2026-11-15
+
+- READMEのMCP設定例を `npx --yes @kagayoi/proton-pass-mcp@latest`（Bunは `bunx --bun @kagayoi/proton-pass-mcp@latest`）に変更し、起動のたびに最新版を使えるようにしました。固定版で登録済みの場合に起動引数を `@latest` へ書き換える移行案内を追加しました。
+
 ## 1.0.10 - 2026-10-25
 
 - 秘密値をMCP応答へ含めず、一時ファイルからブラウザへ入力する `create_field_handoff` と `release_field_handoff` を追加しました。使用後・期限切れ・異常終了時に回収します。
