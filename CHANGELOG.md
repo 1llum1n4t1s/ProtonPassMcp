@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+## 1.0.12 - 2026-11-15
+
+- `setup` と `--help` の出力・標準エラーへの案内を9言語（ja・en・zh-CN・zh-TW・ko・es・fr・de・pt-BR）に対応し、`PROTON_PASS_MCP_LANGUAGE` またはOSの言語設定で切り替わるようにしました。MCPツールの説明と応答・エラーは英語に統一しました。
+- READMEを英語の `README.md` を正本に、日本語を含む8言語版（`README.ja.md` など）へ分けました。
+
 ## 1.0.11 - 2026-11-15
 
 - READMEのMCP設定例を `npx --yes @kagayoi/proton-pass-mcp@latest`（Bunは `bunx --bun @kagayoi/proton-pass-mcp@latest`）に変更し、起動のたびに最新版を使えるようにしました。固定版で登録済みの場合に起動引数を `@latest` へ書き換える移行案内を追加しました。
