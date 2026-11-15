@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { id, field } from './inputs.mjs';
 import { PassError } from './pass.mjs';
 
-export const INVALID_POLICY_MESSAGE = 'PROTON_PASS_ACCESS_POLICY が無効です。ローカルのアクセス設定を確認してください。';
+export const INVALID_POLICY_MESSAGE = 'PROTON_PASS_ACCESS_POLICY is invalid. Check the local access policy.';
 
 // Date.parseだけでは2月30日等が正規化されるため、暦と時差も検証する。
 function validExpiry(value) {
@@ -46,7 +46,7 @@ export function parseAccessPolicy(raw) {
   const reads = [];
   function assertActive() {
     if (expiresAt !== undefined && Date.now() >= expiresAt) {
-      throw new PassError('アクセス設定の有効期限が切れています。');
+      throw new PassError('The access policy has expired.');
     }
   }
   // 許可集合や読み取り履歴への変更用参照は外へ渡さない。
@@ -57,17 +57,17 @@ export function parseAccessPolicy(raw) {
     allowsItem: (shareId, itemId) => allowed.get(shareId)?.has(itemId) === true,
     assertShare(shareId) {
       assertActive();
-      if (!allowed.has(shareId)) throw new PassError('アクセス設定で許可されていない保管庫です。');
+      if (!allowed.has(shareId)) throw new PassError('This vault is not allowed by the access policy.');
     },
     consumeRead(shareId, itemId, fieldName) {
       assertActive();
       if (!allowed.get(shareId)?.get(itemId)?.has(fieldName)) {
-        throw new PassError('アクセス設定で許可されていないアイテムまたはフィールドです。');
+        throw new PassError('This item or field is not allowed by the access policy.');
       }
       const now = performance.now();
       while (reads.length && now - reads[0] >= 60000) reads.shift();
       if (reads.length >= parsed.max_reads_per_minute) {
-        throw new PassError('アクセス設定の1分間の取得上限に達しました。');
+        throw new PassError('The per-minute read limit of the access policy was reached.');
       }
       reads.push(now);
     },

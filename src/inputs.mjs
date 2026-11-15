@@ -4,9 +4,9 @@ export const id = z.string().min(1).max(512).regex(/^[A-Za-z0-9_+=-]+$/);
 
 // pass-cliはRustのchars().count()でUnicodeコードポイント数を数える。
 export const reason = z.string().trim().min(5)
-  .refine(value => [...value].length <= 300, '理由は300文字以内で指定してください。')
-  .describe('アクセスが必要な具体的なユーザー依頼・目的（最大300文字）');
+  .refine(value => [...value].length <= 300, 'The reason must be at most 300 characters.')
+  .describe('The concrete user request or purpose that requires access (max 300 characters).');
 
 export const field = z.string().min(1).max(100)
-  .regex(/^[^\u0000-\u001f\u007f-\u009f]+$/, 'フィールド名に制御文字は使用できません。')
-  .describe('pass-cliのフィールド名。空白・日本語・セクション名を含めて指定可能。');
+  .regex(/^[^\u0000-\u001f\u007f-\u009f]+$/, 'Field names must not contain control characters.')
+  .describe('The pass-cli field name. May include spaces, non-ASCII characters, and section names.');

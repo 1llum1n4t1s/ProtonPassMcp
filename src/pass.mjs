@@ -6,7 +6,7 @@ const execute = promisify(execFile);
 export class PassError extends Error {}
 
 export function checkCancellation(signal) {
-  if (signal?.aborted) throw new PassError('呼び出しをキャンセルしました。');
+  if (signal?.aborted) throw new PassError('The call was cancelled.');
 }
 
 // 生のCLIエラーには秘密が含まれ得るため、分類したメッセージだけ返す。
@@ -20,38 +20,38 @@ export async function runCli(executable, args, env, signal) {
     });
     return stdout;
   } catch (error) {
-    if (error.name === 'AbortError') throw new PassError('呼び出しをキャンセルしました。');
-    if (error.code === 'ENOENT') throw new PassError('pass-cli の実行ファイルが見つかりません。proton-pass-mcp setup を実行するか、PASS_CLI_PATH を確認してください。');
-    if (error.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') throw new PassError('pass-cli の出力が上限（8 MiB）を超えました。');
-    if (error.killed) throw new PassError('pass-cli がタイムアウトしました。再試行してください。');
+    if (error.name === 'AbortError') throw new PassError('The call was cancelled.');
+    if (error.code === 'ENOENT') throw new PassError('The pass-cli executable was not found. Run proton-pass-mcp setup or check PASS_CLI_PATH.');
+    if (error.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') throw new PassError('pass-cli output exceeded the limit (8 MiB).');
+    if (error.killed) throw new PassError('pass-cli timed out. Please retry.');
     const stderr = error.stderr ?? '';
     // CLIの具体的な診断だけを分類する。パスやURL中のsession等では判定しない。
     if (/Your session has been invalidated and you have been logged out automatically\./i.test(stderr)) {
-      throw new PassError('Proton Passセッションが無効化され、CLIにより自動ログアウトされました。同じ PROTON_PASS_SESSION_DIR で再認証してください。');
+      throw new PassError('The Proton Pass session was invalidated and the CLI logged out automatically. Re-authenticate with the same PROTON_PASS_SESSION_DIR.');
     }
     if (/Command is not logout there is no session/i.test(stderr)) {
-      throw new PassError('指定された保存先に有効なProton Passセッションがありません。同じ PROTON_PASS_SESSION_DIR で認証状態を確認してください。失効理由はCLIから取得できません。');
+      throw new PassError('No valid Proton Pass session exists in the specified directory. Check the authentication state with the same PROTON_PASS_SESSION_DIR. The CLI cannot report why a session expired.');
     }
     if (/This operation requires an authenticated client/i.test(stderr)) {
-      throw new PassError('Proton Passの認証が必要です。同じ PROTON_PASS_SESSION_DIR で再認証してください。');
+      throw new PassError('Proton Pass authentication is required. Re-authenticate with the same PROTON_PASS_SESSION_DIR.');
     }
-    throw new PassError('pass-cli が失敗しました。対象ID・フィールド名・接続とアクセス権を確認してください。');
+    throw new PassError('pass-cli failed. Check the target IDs, field name, connection, and access rights.');
   }
 }
 
 function decode(text) {
   try { return JSON.parse(text); }
-  catch { throw new PassError('pass-cli が有効なJSONを返しませんでした。'); }
+  catch { throw new PassError('pass-cli did not return valid JSON.'); }
 }
 
 function array(value) {
-  if (!Array.isArray(value)) throw new PassError('pass-cliのJSON構造が想定と異なります。');
+  if (!Array.isArray(value)) throw new PassError('The pass-cli JSON structure is unexpected.');
   return value;
 }
 
 function metadata(item) {
   if (!item || !['id', 'share_id', 'title', 'state', 'item_type'].every(key => typeof item[key] === 'string')) {
-    throw new PassError('pass-cliのJSON構造が想定と異なります。');
+    throw new PassError('The pass-cli JSON structure is unexpected.');
   }
   return { id: item.id, share_id: item.share_id, title: item.title,
     state: item.state, item_type: item.item_type };
@@ -59,7 +59,7 @@ function metadata(item) {
 
 function strings(value, keys) {
   if (!value || !keys.every(key => typeof value[key] === 'string')) {
-    throw new PassError('pass-cliのJSON構造が想定と異なります。');
+    throw new PassError('The pass-cli JSON structure is unexpected.');
   }
   return Object.fromEntries(keys.map(key => [key, value[key]]));
 }
@@ -72,13 +72,13 @@ function shareRole(value) {
     && custom.permission >= 0 && custom.permission <= 65535) {
     return { Custom: { name: custom.name, permission: custom.permission } };
   }
-  throw new PassError('pass-cliのJSON構造が想定と異なります。');
+  throw new PassError('The pass-cli JSON structure is unexpected.');
 }
 
 export class PassClient {
   constructor({ executable, sessionDir, runner = runCli, env = process.env, policy }) {
-    if (!executable) throw new PassError('pass-cli が見つかりません。proton-pass-mcp setup を実行するか、PASS_CLI_PATH を設定してください。');
-    if (!sessionDir) throw new PassError('PROTON_PASS_SESSION_DIR を設定してください。');
+    if (!executable) throw new PassError('pass-cli was not found. Run proton-pass-mcp setup or set PASS_CLI_PATH.');
+    if (!sessionDir) throw new PassError('Set PROTON_PASS_SESSION_DIR.');
     this.executable = executable;
     this.env = { ...env };
     // Windowsの環境変数名は大小文字を区別しない。指定セッションも一意にする。
@@ -132,7 +132,7 @@ export class PassClient {
     const data = await this.command(['share', 'list', '--output', 'json'], { signal });
     return { shares: array(data?.shares).map(s => {
       const value = strings(s, ['id', 'name', 'share_type']);
-      if (!['Vault', 'Item'].includes(value.share_type)) throw new PassError('pass-cliのJSON構造が想定と異なります。');
+      if (!['Vault', 'Item'].includes(value.share_type)) throw new PassError('The pass-cli JSON structure is unexpected.');
       return { share_id: value.id, name: value.name, share_type: value.share_type, share_role: shareRole(s.share_role) };
     }).filter(s => !this.policy || this.policy.allowsShare(s.share_id)) };
   }
@@ -159,7 +159,7 @@ export class PassClient {
   }
 
   async searchNotes(input, signal) {
-    if (this.policy) throw new PassError('アクセス設定が有効な間はノート本文検索を使用できません。タイトル検索を使用してください。');
+    if (this.policy) throw new PassError('Note body search is unavailable while an access policy is active. Use title search instead.');
     const started = Date.now();
     const { query, reason, cursor, page_size = 3 } = input;
     const items = await this.items({ ...input, type: 'note' }, signal);
@@ -170,9 +170,9 @@ export class PassClient {
     if (cursor) {
       let saved;
       try { saved = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')); }
-      catch { throw new PassError('検索カーソルが無効です。'); }
+      catch { throw new PassError('The search cursor is invalid.'); }
       if (saved?.fingerprint !== fingerprint || !Number.isInteger(saved.offset) || saved.offset < 0 || saved.offset > items.length) {
-        throw new PassError('検索条件または対象一覧が変わりました。カーソルを省略して再検索してください。');
+        throw new PassError('The search criteria or the target list changed. Search again without the cursor.');
       }
       offset = saved.offset;
     }
@@ -184,7 +184,7 @@ export class PassClient {
         `--item-id=${item.id}`, '--output', 'json'], { reason, signal });
       const content = data.item?.content;
       if (typeof content?.note !== 'string' || typeof content.title !== 'string') {
-        throw new PassError('ノートのJSON構造が想定と異なります。');
+        throw new PassError('The note JSON structure is unexpected.');
       }
       if (content.title.includes(query) || content.note.includes(query)) matches.push(item);
       checked++;

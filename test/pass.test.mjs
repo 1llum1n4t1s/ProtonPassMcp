@@ -71,15 +71,15 @@ test('認証失敗時にデータ取得を実行しない', async () => {
 test('認証エラーを具体的に分類し、sessionを含むだけの障害は未認証扱いしない', async () => {
   const cases = [
     ['Command is not logout there is no session\nError: This operation requires an authenticated client',
-      '指定された保存先に有効なProton Passセッションがありません。同じ PROTON_PASS_SESSION_DIR で認証状態を確認してください。失効理由はCLIから取得できません。'],
+      'No valid Proton Pass session exists in the specified directory. Check the authentication state with the same PROTON_PASS_SESSION_DIR. The CLI cannot report why a session expired.'],
     ['Your session has been invalidated and you have been logged out automatically.\nPlease log in again with: pass login',
-      'Proton Passセッションが無効化され、CLIにより自動ログアウトされました。同じ PROTON_PASS_SESSION_DIR で再認証してください。'],
+      'The Proton Pass session was invalidated and the CLI logged out automatically. Re-authenticate with the same PROTON_PASS_SESSION_DIR.'],
     ['Error: This operation requires an authenticated client',
-      'Proton Passの認証が必要です。同じ PROTON_PASS_SESSION_DIR で再認証してください。'],
+      'Proton Pass authentication is required. Re-authenticate with the same PROTON_PASS_SESSION_DIR.'],
     ['Error: Permission denied reading session.json',
-      'pass-cli が失敗しました。対象ID・フィールド名・接続とアクセス権を確認してください。'],
+      'pass-cli failed. Check the target IDs, field name, connection, and access rights.'],
     ['Error: connection failed at https://example.invalid/session',
-      'pass-cli が失敗しました。対象ID・フィールド名・接続とアクセス権を確認してください。'],
+      'pass-cli failed. Check the target IDs, field name, connection, and access rights.'],
   ];
   for (const [stderr, expected] of cases) {
     await assert.rejects(runCli(process.execPath,
@@ -146,7 +146,7 @@ test('不正な一覧メタデータは一覧・ノート検索とも安全な�
       () => client.searchNotes({ share_id: 'vault', query: 'x', reason: 'test reason' })]) {
       await assert.rejects(work(), error => {
         assert.ok(error instanceof PassError);
-        assert.equal(error.message, 'pass-cliのJSON構造が想定と異なります。');
+        assert.equal(error.message, 'The pass-cli JSON structure is unexpected.');
         return true;
       });
     }
@@ -168,7 +168,7 @@ test('キュー待ち中のキャンセルは秘密の理由を出さず後続�
   });
   const rejected = assert.rejects(cancelled, error => {
     assert.ok(error instanceof PassError);
-    assert.equal(error.message, '呼び出しをキャンセルしました。');
+    assert.equal(error.message, 'The call was cancelled.');
     return true;
   });
   controller.abort(new Error('SECRET_REASON'));
@@ -215,7 +215,7 @@ test('stdoutとstderrの出力上限超過は内容を出さず専用エラー�
     await assert.rejects(runCli(process.execPath,
       ['-e', `process.${stream}.write('SECRET'.repeat(1500000))`], process.env), error => {
       assert.ok(error instanceof PassError);
-      assert.equal(error.message, 'pass-cli の出力が上限（8 MiB）を超えました。');
+      assert.equal(error.message, 'pass-cli output exceeded the limit (8 MiB).');
       assert.equal(error.stdout, undefined);
       assert.equal(error.stderr, undefined);
       return true;

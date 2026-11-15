@@ -8,7 +8,7 @@ import { PassError } from './pass.mjs';
 import { APP_ID, FILE_PATTERN, removeFile } from './handoff-protocol.mjs';
 import { marker, minimalEnvironment, protectDirectory, sweepOldSessions, sweepSession, writePrivate } from './handoff-security.mjs';
 
-const failure = () => new PassError('フィールドの受け渡しを準備または回収できませんでした。保存先とアクセス権を確認し、再起動してください。');
+const failure = () => new PassError('The field handoff could not be prepared or reclaimed. Check the storage location and access rights, then restart.');
 const cancelled = signal => { if (signal?.aborted) throw failure(); };
 export class FileHandoffStore {
   constructor({ directory, ttlSeconds = 60 } = {}) {

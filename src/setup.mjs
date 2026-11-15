@@ -10,6 +10,7 @@ import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { Readable, Transform } from 'node:stream';
 import { promisify } from 'node:util';
+import { t } from './i18n.mjs';
 
 const execute = promisify(execFile);
 
@@ -54,7 +55,7 @@ export function defaultInstallDir({
 } = {}) {
   if (platform === 'win32') {
     const localAppData = envValue(env, 'LOCALAPPDATA', platform);
-    if (!localAppData) throw new SetupError('LOCALAPPDATA が設定されていないため、既定の導入先を決定できません。');
+    if (!localAppData) throw new SetupError(t('setup.noLocalAppData'));
     return path.join(localAppData, 'Programs', 'ProtonPass');
   }
   return path.join(homedir, '.local', 'bin');
@@ -72,7 +73,7 @@ export function resolveCliPath({
     const explicit = typeof configured === 'string' ? configured.trim() : '';
     const candidate = path.resolve(explicit);
     if (explicit && isRegularFile(candidate, platform)) return candidate;
-    throw new SetupError('PASS_CLI_PATH が有効なProton Pass CLIの実行ファイルを指していません。値を修正するか、自動検出を使う場合はこの変数を削除してください。');
+    throw new SetupError(t('setup.invalidCliPath'));
   }
 
   let destinationDir;
@@ -104,7 +105,7 @@ export function platformAssetKey(platform = process.platform, arch = process.arc
   const platformKey = { win32: 'windows', darwin: 'macos', linux: 'linux' }[platform];
   const archKey = { x64: 'x86_64', arm64: 'aarch64' }[arch];
   if (!platformKey || !archKey || (platform === 'win32' && arch !== 'x64')) {
-    throw new SetupError(`この環境（${platform}/${arch}）向けのProton Pass CLIはサポートしていません。`);
+    throw new SetupError(t('setup.unsupportedPlatform', { platform, arch }));
   }
   return { platformKey, archKey };
 }
@@ -112,11 +113,11 @@ export function platformAssetKey(platform = process.platform, arch = process.arc
 export function validateDownloadUrl(value) {
   let url;
   try { url = new URL(value); }
-  catch { throw new SetupError('公式マニフェスト内のダウンロードURLが不正です。'); }
+  catch { throw new SetupError(t('setup.badDownloadUrl')); }
   if (url.protocol !== 'https:' || url.hostname !== 'proton.me'
     || !url.pathname.startsWith(TRUSTED_PATH_PREFIX)
     || url.username || url.password || url.port) {
-    throw new SetupError('公式マニフェスト内のダウンロードURLが許可範囲外です。');
+    throw new SetupError(t('setup.downloadUrlNotAllowed'));
   }
   return url;
 }
@@ -124,23 +125,23 @@ export function validateDownloadUrl(value) {
 export function selectManifestAsset(manifest, platform = process.platform, arch = process.arch) {
   if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)
     || manifest.formatVersion !== 1) {
-    throw new SetupError('Proton Pass CLIのマニフェスト形式に対応していません。');
+    throw new SetupError(t('setup.unsupportedManifest'));
   }
   const release = manifest.passCliVersions;
   if (!release || typeof release !== 'object' || Array.isArray(release)
     || typeof release.version !== 'string'
     || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(release.version)) {
-    throw new SetupError('Proton Pass CLIのマニフェストにバージョン情報がありません。');
+    throw new SetupError(t('setup.noManifestVersion'));
   }
   const { platformKey, archKey } = platformAssetKey(platform, arch);
   const asset = release.urls?.[platformKey]?.[archKey];
   if (!asset || typeof asset !== 'object' || Array.isArray(asset)
     || typeof asset.url !== 'string' || typeof asset.hash !== 'string') {
-    throw new SetupError('この環境向けのProton Pass CLIがマニフェストにありません。');
+    throw new SetupError(t('setup.noAssetForPlatform'));
   }
   const url = validateDownloadUrl(asset.url);
   if (!/^[0-9a-fA-F]{64}$/.test(asset.hash)) {
-    throw new SetupError('公式マニフェスト内のSHA-256が不正です。');
+    throw new SetupError(t('setup.badSha'));
   }
   return { version: release.version, url: url.href, hash: asset.hash.toLowerCase() };
 }
@@ -154,12 +155,12 @@ function parseArgs(args) {
       force = true;
     } else if (argument === '--install-dir') {
       installDir = args[++index];
-      if (!installDir) throw new SetupError('--install-dir には導入先ディレクトリが必要です。');
+      if (!installDir) throw new SetupError(t('setup.installDirRequired'));
     } else if (argument.startsWith('--install-dir=')) {
       installDir = argument.slice('--install-dir='.length);
-      if (!installDir) throw new SetupError('--install-dir には導入先ディレクトリが必要です。');
+      if (!installDir) throw new SetupError(t('setup.installDirRequired'));
     } else {
-      throw new SetupError('不明なsetupオプションです。');
+      throw new SetupError(t('setup.unknownOption'));
     }
   }
   return { force, installDir: installDir ? path.resolve(installDir) : undefined };
@@ -174,38 +175,38 @@ async function trustedFetch(fetchImpl, initialUrl, timeoutMs) {
         redirect: 'manual', signal: AbortSignal.timeout(timeoutMs),
       });
     } catch {
-      throw new SetupError('Proton Pass CLIの公式ダウンロードに失敗しました。');
+      throw new SetupError(t('setup.downloadFailed'));
     }
     if ([301, 302, 303, 307, 308].includes(response.status)) {
-      if (redirects === MAX_REDIRECTS) throw new SetupError('公式ダウンロードのリダイレクト回数が上限を超えました。');
+      if (redirects === MAX_REDIRECTS) throw new SetupError(t('setup.redirectLimit'));
       const location = response.headers.get('location');
-      if (!location) throw new SetupError('公式ダウンロードのリダイレクト先がありません。');
+      if (!location) throw new SetupError(t('setup.noRedirectTarget'));
       await response.body?.cancel();
       current = validateDownloadUrl(new URL(location, current).href);
       continue;
     }
-    if (!response.ok) throw new SetupError('Proton Pass CLIの公式ダウンロードに失敗しました。');
+    if (!response.ok) throw new SetupError(t('setup.downloadFailed'));
     return response;
   }
-  throw new SetupError('Proton Pass CLIの公式ダウンロードに失敗しました。');
+  throw new SetupError(t('setup.downloadFailed'));
 }
 
 function contentLengthWithin(response, maxBytes) {
   const header = response.headers.get('content-length');
   if (header === null) return;
   if (!/^\d+$/.test(header) || Number(header) > maxBytes) {
-    throw new SetupError(`ダウンロードサイズが上限（${maxBytes} bytes）を超えています。`);
+    throw new SetupError(t('setup.sizeExceeded', { max: maxBytes }));
   }
 }
 
 async function responseBuffer(response, maxBytes) {
   contentLengthWithin(response, maxBytes);
-  if (!response.body) throw new SetupError('公式ダウンロードの内容が空です。');
+  if (!response.body) throw new SetupError(t('setup.emptyDownload'));
   const chunks = [];
   let size = 0;
   for await (const chunk of Readable.fromWeb(response.body)) {
     size += chunk.length;
-    if (size > maxBytes) throw new SetupError(`ダウンロードサイズが上限（${maxBytes} bytes）を超えています。`);
+    if (size > maxBytes) throw new SetupError(t('setup.sizeExceeded', { max: maxBytes }));
     chunks.push(chunk);
   }
   return Buffer.concat(chunks, size);
@@ -213,14 +214,14 @@ async function responseBuffer(response, maxBytes) {
 
 async function downloadFile(response, filename, maxBytes) {
   contentLengthWithin(response, maxBytes);
-  if (!response.body) throw new SetupError('公式ダウンロードの内容が空です。');
+  if (!response.body) throw new SetupError(t('setup.emptyDownload'));
   const hash = createHash('sha256');
   let size = 0;
   const limiter = new Transform({
     transform(chunk, _encoding, callback) {
       size += chunk.length;
       if (size > maxBytes) {
-        callback(new SetupError(`ダウンロードサイズが上限（${maxBytes} bytes）を超えています。`));
+        callback(new SetupError(t('setup.sizeExceeded', { max: maxBytes })));
         return;
       }
       hash.update(chunk);
@@ -242,7 +243,7 @@ async function downloadFile(response, filename, maxBytes) {
 async function defaultExpandArchive(archive, destination) {
   const windowsDir = envValue(process.env, 'SYSTEMROOT', 'win32')
     ?? envValue(process.env, 'WINDIR', 'win32');
-  if (!windowsDir) throw new SetupError('Windows PowerShellの場所を特定できません。');
+  if (!windowsDir) throw new SetupError(t('setup.noPowerShell'));
   const powershell = path.join(windowsDir, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
   const script = 'Expand-Archive -LiteralPath $env:PROTON_PASS_MCP_ARCHIVE -DestinationPath $env:PROTON_PASS_MCP_DESTINATION -Force';
   const encoded = Buffer.from(script, 'utf16le').toString('base64');
@@ -264,10 +265,10 @@ function regularFiles(root, current = root) {
   for (const entry of readdirSync(current, { withFileTypes: true })) {
     const filename = path.join(current, entry.name);
     const info = lstatSync(filename);
-    if (info.isSymbolicLink()) throw new SetupError('ZIP内にシンボリックリンクが含まれているため導入を中止しました。');
+    if (info.isSymbolicLink()) throw new SetupError(t('setup.zipSymlink'));
     if (info.isDirectory()) files.push(...regularFiles(root, filename));
     else if (info.isFile()) files.push({ source: filename, relative: path.relative(root, filename) });
-    else throw new SetupError('ZIP内に通常ファイル以外が含まれているため導入を中止しました。');
+    else throw new SetupError(t('setup.zipNonRegular'));
   }
   return files;
 }
@@ -303,7 +304,7 @@ async function installFilesTransaction(files, destinationDir, backupRoot, replac
     try {
       const info = lstatSync(destination);
       if (info.isSymbolicLink() || !info.isFile()) {
-        throw new SetupError('導入先に通常ファイル以外の同名項目があるため中止しました。');
+        throw new SetupError(t('setup.destNonRegular'));
       }
       existed = true;
       previousMode = info.mode & 0o777;
@@ -336,15 +337,15 @@ async function installFilesTransaction(files, destinationDir, backupRoot, replac
       try {
         await rename(backupRoot, recoveryDir);
       } catch {
-        throw new SetupError(`CLIの導入と既存ファイルの復元に失敗しました。旧版バックアップを保持しています: ${path.dirname(backupRoot)}`, {
+        throw new SetupError(t('setup.restoreFailedBackupKept', { dir: path.dirname(backupRoot) }), {
           recoveryDir: path.dirname(backupRoot),
         });
       }
-      throw new SetupError(`CLIの導入と既存ファイルの復元に失敗しました。旧版バックアップを保持しています: ${recoveryDir}`, {
+      throw new SetupError(t('setup.restoreFailedBackupKept', { dir: recoveryDir }), {
         recoveryDir,
       });
     }
-    throw new SetupError('CLIの導入に失敗したため、既存ファイルを復元しました。');
+    throw new SetupError(t('setup.restoredAfterFailure'));
   }
 }
 
@@ -363,20 +364,20 @@ export async function runSetup(args = [], options = {}) {
     if (existing) {
       return {
         installed: false, executable: existing, version: null,
-        message: `既存のProton Pass CLIを使用します: ${existing}\nログインとPATHの変更は行っていません。`,
+        message: t('setup.usingExisting', { path: existing }),
       };
     }
   }
 
   const destinationDir = path.resolve(installDir ?? defaultInstallDir({ platform, env, homedir }));
   const fetchImpl = options.fetch ?? globalThis.fetch;
-  if (typeof fetchImpl !== 'function') throw new SetupError('ダウンロード機能を利用できません。');
+  if (typeof fetchImpl !== 'function') throw new SetupError(t('setup.noFetch'));
   const temporaryRoot = mkdtempSync(path.join(options.tmpdir ?? os.tmpdir(), 'proton-pass-mcp-setup-'));
   let preserveTemporaryRoot = false;
   try {
     const fetchTimeoutMs = options.fetchTimeoutMs ?? DEFAULT_FETCH_TIMEOUT_MS;
     if (!Number.isSafeInteger(fetchTimeoutMs) || fetchTimeoutMs < 1) {
-      throw new SetupError('ダウンロードのタイムアウト設定が不正です。');
+      throw new SetupError(t('setup.badTimeout'));
     }
     const manifestResponse = await trustedFetch(fetchImpl, MANIFEST_URL, fetchTimeoutMs);
     const manifestBytes = await responseBuffer(
@@ -384,7 +385,7 @@ export async function runSetup(args = [], options = {}) {
     );
     let manifest;
     try { manifest = JSON.parse(manifestBytes.toString('utf8')); }
-    catch { throw new SetupError('Proton Pass CLIの公式マニフェストが有効なJSONではありません。'); }
+    catch { throw new SetupError(t('setup.manifestNotJson')); }
     const asset = selectManifestAsset(manifest, platform, arch);
     const assetResponse = await trustedFetch(fetchImpl, asset.url, fetchTimeoutMs);
     const downloadPath = path.join(temporaryRoot, platform === 'win32' ? 'pass-cli.zip' : 'pass-cli');
@@ -392,7 +393,7 @@ export async function runSetup(args = [], options = {}) {
       assetResponse, downloadPath, options.downloadMaxBytes ?? DEFAULT_DOWNLOAD_MAX_BYTES,
     );
     if (actualHash !== asset.hash) {
-      throw new SetupError('ダウンロードしたProton Pass CLIのSHA-256が公式値と一致しません。導入を中止しました。');
+      throw new SetupError(t('setup.shaMismatch'));
     }
 
     let executable;
@@ -403,12 +404,12 @@ export async function runSetup(args = [], options = {}) {
         await (options.expandArchive ?? defaultExpandArchive)(downloadPath, extracted);
       } catch (error) {
         if (error instanceof SetupError) throw error;
-        throw new SetupError('Windows ZIPの展開に失敗しました。Windows PowerShellと公式配布物を確認してください。');
+        throw new SetupError(t('setup.zipExtractFailed'));
       }
       const files = regularFiles(extracted);
-      if (files.length === 0) throw new SetupError('公式ZIPに導入可能なファイルがありません。');
+      if (files.length === 0) throw new SetupError(t('setup.zipEmpty'));
       if (!files.some(file => file.relative === executableName(platform))) {
-        throw new SetupError('公式ZIPに pass-cli.exe がありません。');
+        throw new SetupError(t('setup.zipNoExe'));
       }
       await installFilesTransaction(files, destinationDir, path.join(temporaryRoot, 'backup'),
         options.replaceFile);
@@ -422,14 +423,14 @@ export async function runSetup(args = [], options = {}) {
 
     return {
       installed: true, executable, version: asset.version,
-      message: `Proton Pass CLI ${asset.version} を導入しました: ${executable}\nログインとPATHの変更は行っていません。必要に応じて pass-cli login を実行してください。`,
+      message: t('setup.installed', { version: asset.version, path: executable }),
     };
   } catch (error) {
     if (error instanceof SetupError) {
       preserveTemporaryRoot = error.recoveryDir === temporaryRoot;
       throw error;
     }
-    throw new SetupError('Proton Pass CLIのセットアップに失敗しました。導入先の権限と空き容量を確認してください。');
+    throw new SetupError(t('setup.failedGeneric'));
   } finally {
     if (!preserveTemporaryRoot) rmSync(temporaryRoot, { recursive: true, force: true });
   }

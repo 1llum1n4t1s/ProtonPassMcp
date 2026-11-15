@@ -2,7 +2,7 @@ import { lstat, open, rename } from 'node:fs/promises';
 import { dirname, parse } from 'node:path';
 import { APP_ID, receiptPath, regular, same, removeFile } from './handoff-protocol.mjs';
 
-const failure = () => new Error('フィールドの受け渡しに失敗しました。新しい受け渡しを作成してください。');
+const failure = () => new Error('The field handoff failed. Create a new handoff.');
 export async function withFieldHandoff(receipt, consumer) {
   let claimed;
   let identity;

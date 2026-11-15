@@ -11,6 +11,9 @@ import {
   selectManifestAsset,
 } from '../src/setup.mjs';
 
+// 人が読む文言は言語で変わるため、メッセージの検証は英語に固定する。
+process.env.PROTON_PASS_MCP_LANGUAGE = 'en';
+
 function release(asset, overrides = {}) {
   const hash = createHash('sha256').update(asset).digest('hex');
   return {
@@ -121,7 +124,7 @@ test('forceなしで既存CLIを再利用しダウンロードしない', async 
   assert.equal(result.installed, false);
   assert.equal(result.executable, executable);
   assert.equal(fetched, false);
-  assert.match(result.message, /既存/);
+  assert.match(result.message, /existing/);
 });
 
 test('Unix資産を検証して指定先へ755で導入し一時物を清掃する', async t => {
@@ -143,7 +146,7 @@ test('Unix資産を検証して指定先へ755で導入し一時物を清掃す�
   if (process.platform !== 'win32') assert.equal((statSync(result.executable).mode & 0o777), 0o755);
   assert.deepEqual(await readdir(scratch), []);
   assert.equal(calls.length, 2);
-  assert.match(result.message, /ログインとPATHの変更は行っていません/);
+  assert.match(result.message, /Login and PATH were not changed/);
 });
 
 test('Windows ZIP内の通常ファイルをすべて指定先へ配置する', async t => {
@@ -180,8 +183,8 @@ test('Windows ZIPの展開失敗を専用エラーへ分類して一時物を清
     fetch: responses(release(archive), archive),
     expandArchive: async () => { throw new Error('simulated Expand-Archive failure'); },
   }), error => error instanceof SetupError
-    && /Windows ZIPの展開/.test(error.message)
-    && !/権限と空き容量/.test(error.message));
+    && /Failed to extract the Windows ZIP/.test(error.message)
+    && !/permissions and free space/.test(error.message));
   assert.deepEqual(await readdir(scratch), []);
 });
 
@@ -219,7 +222,7 @@ test('Windowsの複数ファイル更新に失敗した場合は既存版を復�
       }
       await copyFile(source, destination);
     },
-  }), /既存ファイルを復元/);
+  }), /existing files were restored/);
   assert.equal(updateAttempts, 2);
   assert.ok(updatedFile);
   assert.equal(await readFile(path.join(installDir, 'libcrypto-3-x64.dll'), 'utf8'), 'old dll');
@@ -275,7 +278,7 @@ test('Windowsの復元にも失敗した場合は旧版バックアップを保�
   assert.equal(rollbackFailureInjected, true);
   assert.equal(await readFile(updatedFile, 'utf8'), updatedContents);
   assert.ok(failure instanceof SetupError);
-  assert.match(failure.message, /旧版バックアップを保持/);
+  assert.match(failure.message, /backup was kept/);
   assert.equal(await readFile(path.join(failure.recoveryDir, 'libcrypto-3-x64.dll'), 'utf8'), 'old dll');
   assert.equal(await readFile(path.join(failure.recoveryDir, 'pass-cli.exe'), 'utf8'), 'old exe');
 });
@@ -328,7 +331,7 @@ test('Content-Lengthと実受信量のサイズ上限を超えた取得を拒否
     await assert.rejects(runSetup(['--force'], {
       platform: 'linux', arch: 'x64', installDir: path.join(root, 'install'),
       env: { PATH: '' }, tmpdir: scratch, fetch, downloadMaxBytes: 8,
-    }), /サイズが上限/);
+    }), /exceeds the limit/);
     assert.deepEqual(await readdir(scratch), []);
   }
 });
@@ -348,7 +351,7 @@ test('ダウンロード先のオープン失敗を報告し一時物を清掃�
   await assert.rejects(runSetup(['--force'], {
     platform: 'linux', arch: 'x64', installDir: path.join(root, 'install'),
     env: { PATH: '' }, tmpdir: scratch, fetch,
-  }), /セットアップに失敗/);
+  }), /setup failed/);
   assert.deepEqual(await readdir(scratch), []);
 });
 
