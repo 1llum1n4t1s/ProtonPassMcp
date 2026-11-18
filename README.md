@@ -210,7 +210,7 @@ Register the following stdio configuration with your MCP client. If `PASS_CLI_PA
 }
 ```
 
-With `@latest`, the MCP client uses the latest npm version every time it starts the server. If you have already registered a pinned version such as `@kagayoi/proton-pass-mcp@1.0.12`, rewrite the registered start argument to `@kagayoi/proton-pass-mcp@latest` and it will automatically use the latest version from then on (updating this README alone does not change existing registrations). To pin a specific version, register it in this pinned-version form.
+With `@latest`, the MCP client uses the latest npm version every time it starts the server. If you have already registered a pinned version such as `@kagayoi/proton-pass-mcp@1.0.14`, rewrite the registered start argument to `@kagayoi/proton-pass-mcp@latest` and it will automatically use the latest version from then on (updating this README alone does not change existing registrations). To pin a specific version, register it in this pinned-version form.
 
 If you use auto-detection, you can delete the `PASS_CLI_PATH` line. For a custom CLI location, change it to the absolute path of that executable. The PAT is not stored in the settings file; the existing session is referenced. This server never saves secret bodies or raw CLI errors to logs. The result of a field read is handed to the connected client.
 

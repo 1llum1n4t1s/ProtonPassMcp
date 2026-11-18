@@ -210,7 +210,7 @@ mkdir -p "$PROTON_PASS_SESSION_DIR"
 }
 ```
 
-指定 `@latest` 後，MCP 用戶端每次啟動伺服器都會使用 npm 上的最新版本。如果已經以 `@kagayoi/proton-pass-mcp@1.0.12` 這樣的固定版本註冊，請將已註冊的啟動引數改寫為 `@kagayoi/proton-pass-mcp@latest`，此後會自動使用最新版本（僅更新 README 不會改變既有註冊）。如果想固定到特定版本，請以這種固定版本的形式註冊。
+指定 `@latest` 後，MCP 用戶端每次啟動伺服器都會使用 npm 上的最新版本。如果已經以 `@kagayoi/proton-pass-mcp@1.0.14` 這樣的固定版本註冊，請將已註冊的啟動引數改寫為 `@kagayoi/proton-pass-mcp@latest`，此後會自動使用最新版本（僅更新 README 不會改變既有註冊）。如果想固定到特定版本，請以這種固定版本的形式註冊。
 
 使用自動偵測時，可以刪除 `PASS_CLI_PATH` 一行。對於自訂的 CLI 位置，請改為該可執行檔的絕對路徑。PAT 不會儲存到設定檔中，而是參照既有工作階段。此伺服器不會把機密內文或 CLI 的原始錯誤儲存到記錄。欄位取得的結果會交給所連線的用戶端。
 

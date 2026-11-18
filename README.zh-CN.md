@@ -210,7 +210,7 @@ mkdir -p "$PROTON_PASS_SESSION_DIR"
 }
 ```
 
-指定 `@latest` 后，MCP 客户端每次启动服务器都会使用 npm 上的最新版本。如果已经以 `@kagayoi/proton-pass-mcp@1.0.12` 这样的固定版本注册，请将已注册的启动参数改写为 `@kagayoi/proton-pass-mcp@latest`，此后会自动使用最新版本（仅更新 README 不会改变现有注册）。如果想固定到特定版本，请以这种固定版本的形式注册。
+指定 `@latest` 后，MCP 客户端每次启动服务器都会使用 npm 上的最新版本。如果已经以 `@kagayoi/proton-pass-mcp@1.0.14` 这样的固定版本注册，请将已注册的启动参数改写为 `@kagayoi/proton-pass-mcp@latest`，此后会自动使用最新版本（仅更新 README 不会改变现有注册）。如果想固定到特定版本，请以这种固定版本的形式注册。
 
 使用自动检测时，可以删除 `PASS_CLI_PATH` 一行。对于自定义的 CLI 位置，请改为该可执行文件的绝对路径。PAT 不会保存到配置文件中，而是引用现有会话。此服务器不会把机密正文或 CLI 的原始错误保存到日志。字段获取的结果会交给所连接的客户端。
 

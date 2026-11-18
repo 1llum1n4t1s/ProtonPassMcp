@@ -210,7 +210,7 @@ Registre la siguiente configuración stdio en su cliente MCP. Si se omite `PASS_
 }
 ```
 
-Con `@latest`, el cliente MCP usa la última versión de npm cada vez que inicia el servidor. Si ya lo registró con una versión fija como `@kagayoi/proton-pass-mcp@1.0.12`, reescriba el argumento de inicio registrado como `@kagayoi/proton-pass-mcp@latest` y a partir de entonces usará automáticamente la última versión (actualizar solo este README no cambia los registros existentes). Para fijar una versión concreta, regístrela con este formato de versión fija.
+Con `@latest`, el cliente MCP usa la última versión de npm cada vez que inicia el servidor. Si ya lo registró con una versión fija como `@kagayoi/proton-pass-mcp@1.0.14`, reescriba el argumento de inicio registrado como `@kagayoi/proton-pass-mcp@latest` y a partir de entonces usará automáticamente la última versión (actualizar solo este README no cambia los registros existentes). Para fijar una versión concreta, regístrela con este formato de versión fija.
 
 Si usa la detección automática, puede eliminar la línea `PASS_CLI_PATH`. Para una ubicación de CLI personalizada, cámbiela por la ruta absoluta de ese ejecutable. El PAT no se guarda en el archivo de configuración; se hace referencia a la sesión existente. Este servidor nunca guarda en los registros los cuerpos secretos ni los errores sin procesar de la CLI. El resultado de leer un campo se entrega al cliente conectado.
 
