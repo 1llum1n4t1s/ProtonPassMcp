@@ -58,6 +58,6 @@ MCP起動と `--force` なしの `setup` では、`PASS_CLI_PATH` を実行対�
 
 ## 配布と公開の境界
 
-`.github/workflows/publish.yml` が npm 公開を担う。`release/**` への push または手動実行を入口とし、公開ジョブは `release/` ブランチだけで動く。ブランチ名が `package.json` の `release/<version>` と一致することを検証してから、固定 lockfile による依存解決、配布内容の確認、BunとNode.js双方のテストへ進む。生成したnpmアーカイブは一度読み込んだ同じバイト列で manifest 全体・許可された全ファイルの内容・種類・重複・CLIの実行権限・READMEの固定バージョンとSHA-512を確認し、公開直前にもハッシュを照合して同じアーカイブを公開する。アーカイブ公開では `prepublishOnly` に依存せず、前段の明示的なテストを公開条件とする。npmレジストリで同一バージョンが公開済みなら再公開を省略する。
+`.github/workflows/publish.yml` が npm 公開を担う。main のコミットに付けた軽量タグ `vX.Y.Z` の push または手動実行（既存タグを `--ref` に指定する再実行）を入口とし、公開ジョブはタグ ref だけで動く。タグ・厳密な形・軽量タグが実行 commit を指すこと・既定ブランチの祖先であること・`package.json` の `v<version>` との一致を検証してから、固定 lockfile による依存解決、配布内容の確認、BunとNode.js双方のテストへ進む。生成したnpmアーカイブは一度読み込んだ同じバイト列で manifest 全体・許可された全ファイルの内容・種類・重複・CLIの実行権限・READMEの固定バージョンとSHA-512を確認し、公開直前にもハッシュを照合して同じアーカイブを公開する。アーカイブ公開では `prepublishOnly` に依存せず、前段の明示的なテストを公開条件とする。npmレジストリで同一バージョンが公開済みなら再公開を省略する。
 
-npm公開用publish.ymlは、npm Trusted Publishingとprovenanceのcloud-hosted build要件に合わせ、install・既存検証・pack・公開をGitHub-hosted ubuntu-latest内で実行する。通常のdependency-validationはM3 Linux ARM64を維持する。保存公開tokenは使わず、同じtarballのSHA-512を確認してOIDCとprovenanceで公開する。workflow filename・従来のrelease/manual条件・concurrency・MCP側認証との独立性を維持する。登録と実行手順はCONTRIBUTING.mdを参照する。
+npm公開用publish.ymlは、npm Trusted Publishingとprovenanceのcloud-hosted build要件に合わせ、install・既存検証・pack・公開をGitHub-hosted ubuntu-latest内で実行する。通常のdependency-validationはM3 Linux ARM64を維持する。保存公開tokenは使わず、同じtarballのSHA-512を確認してOIDCとprovenanceで公開する。workflow filename・タグ起動と手動再実行の条件・concurrency・MCP側認証との独立性を維持する。登録と実行手順はCONTRIBUTING.mdを参照する。

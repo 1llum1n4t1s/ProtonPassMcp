@@ -19,11 +19,11 @@ bun test
 
 ファイル受け渡しを変更した場合は、Windows実機で現在ユーザーだけのprotected ACLと、安全でない既存領域での取得前拒否を確認します。ダミーCLIを実stdio MCPから呼び、会話へ値が出ないこと、consumerを実IABで読み込んだ入力成功、使用後の不存在、二重使用・コールバック例外・期限切れ・キャンセルでの回収を確認します。サーバー強制終了、監視プロセス単独終了、両方終了後の次回起動時の回収も対象です。実パスワードを検証ログやfixtureへ保存しません。
 
-公開は `.github/workflows/publish.yml` からGitHub OIDC Trusted Publishingを使います。`package.json` と一致する `release/<version>` ブランチをpushすると、依存解決・配布確認・BunとNode.jsのテストを実行します。生成したnpmアーカイブを一度読み込み、manifest全体・許可した全ファイルの内容と種類・重複・CLIの実行権限・READMEの固定バージョンを確認し、同じバイト列のSHA-512を算出します。欠落や改ざんなどの不正なアーカイブを拒否するテストも実行し、公開直前にハッシュを再確認して同じアーカイブを公開します。再開時は同じブランチを指定してworkflow_dispatchを実行します。公開済みバージョンはSHA-512とprovenance掲載形式が一致する場合だけ再公開を省略し、内容が異なる場合は停止します。
+公開は `.github/workflows/publish.yml` からGitHub OIDC Trusted Publishingを使います。main のコミットに付け `package.json` と一致する軽量タグ `v<version>` をpushすると（release ブランチと GitHub Release は使いません）、依存解決・配布確認・BunとNode.jsのテストを実行します。生成したnpmアーカイブを一度読み込み、manifest全体・許可した全ファイルの内容と種類・重複・CLIの実行権限・READMEの固定バージョンを確認し、同じバイト列のSHA-512を算出します。欠落や改ざんなどの不正なアーカイブを拒否するテストも実行し、公開直前にハッシュを再確認して同じアーカイブを公開します。再開時は同じタグを `--ref` に指定してworkflow_dispatchを実行します。公開済みバージョンはSHA-512とprovenance掲載形式が一致する場合だけ再公開を省略し、内容が異なる場合は停止します。
 
 公開workflowのcheckoutはnative gitと一時的な認証ヘッダーを使い、Git設定へ認証情報を保存しません。SHA固定の公式 setup-bun Action で Bun を準備し、Node.js 26.13.0 と対応下限の 22.0.0 でも既存の利用経路をテストします。これらのAction自体もGitHub ActionsランナーのNode.jsを使います。
 
-公開処理は scripts/Publish-Npm.ps1 を入口とし、PowerShell 7.4以降のAdd-Typeが同梱C#をメモリー内でコンパイルします。npm Trusted Publishingとprovenanceのcloud-hosted build要件に合わせ、publish.ymlのinstall・既存テスト・pack・配布内容とSHA-512検証・公開をGitHub-hosted ubuntu-latestで実行します。通常のdependency-validationはM3 Linux ARM64を使います。同じtarballを作り直さず公開し、保存npm公開tokenは使いません。既存のworkflow filenameとrelease/manual条件、npm側のTrusted Publisher登録を維持します。
+公開処理は scripts/Publish-Npm.ps1 を入口とし、PowerShell 7.4以降のAdd-Typeが同梱C#をメモリー内でコンパイルします。npm Trusted Publishingとprovenanceのcloud-hosted build要件に合わせ、publish.ymlのinstall・既存テスト・pack・配布内容とSHA-512検証・公開をGitHub-hosted ubuntu-latestで実行します。通常のdependency-validationはM3 Linux ARM64を使います。同じtarballを作り直さず公開し、保存npm公開tokenは使いません。既存のworkflow filenameとタグ起動・手動再実行の条件、npm側のTrusted Publisher登録を維持します。
 
 native publisherはGitHub OIDC交換による短期tokenとcosign 3.0.4によるSLSA v1 provenance署名を使います。cosignの固定SHA-256・公式Sigstore署名、workflow identity・issuer・subject・archive digestを確認し、同じtarballと一緒に送信します。既存版の省略にはSHA-512とprovenance掲載形式の一致を要求します。PUT成功headerはnpm受理を表し、body解析や公開反映待ちGETは行いません。不明なPUT結果は再送しません。ソースhash別namespaceのPowerShell読込みも維持します。
 

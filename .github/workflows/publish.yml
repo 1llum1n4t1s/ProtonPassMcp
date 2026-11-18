@@ -2,7 +2,7 @@ name: Publish npm package
 
 on:
   push:
-    branches: ['release/**']
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
   workflow_dispatch:
 
 permissions:
@@ -14,7 +14,6 @@ concurrency:
 
 jobs:
   publish:
-    if: startsWith(github.ref, 'refs/heads/release/')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -40,13 +39,28 @@ jobs:
         with:
           node-version: '26.13.0'
 
+      - name: Verify release tag, ancestry and version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF_TYPE" == tag ]] || { echo "::error::タグ以外では公開しない: $GITHUB_REF"; exit 1; }
+          [[ "$GITHUB_REF_NAME" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || { echo "::error::版タグの形ではない: $GITHUB_REF_NAME"; exit 1; }
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::GITHUB_SHA が不正"; exit 1; }
+          # 軽量タグで、いまもこの commit を指すこと
+          [[ "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$GITHUB_REF_NAME" --jq '.object.type+" "+.object.sha')" == "commit $GITHUB_SHA" ]] \
+            || { echo "::error::タグが $GITHUB_SHA を指す軽量タグではない"; exit 1; }
+          # 既定ブランチの祖先であること（compare API）
+          default="$(gh api "repos/$GITHUB_REPOSITORY" --jq .default_branch)"
+          cmp="$(gh api "repos/$GITHUB_REPOSITORY/compare/$GITHUB_SHA...$default?per_page=1" --jq '.status+" "+(.behind_by|tostring)')"
+          [[ "$cmp" == "ahead 0" || "$cmp" == "identical 0" ]] || { echo "::error::$default の祖先ではない ($cmp)"; exit 1; }
       - name: Check release version
         run: |
           bun - <<'JS'
           import assert from 'node:assert/strict';
           import { readFileSync } from 'node:fs';
           const { version } = JSON.parse(readFileSync('package.json', 'utf8'));
-          assert.equal(process.env.GITHUB_REF_NAME, `release/${version}`);
+          assert.equal(process.env.GITHUB_REF_NAME, `v${version}`);
           JS
       - run: bun install --frozen-lockfile --no-save
       - name: Check package contents
